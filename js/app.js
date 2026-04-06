@@ -227,24 +227,26 @@ function setupTradeModal() {
 
 function applyTradeTypeUI(type) {
   const isMissed = type === 'missed';
-  const banner   = document.getElementById('missed-banner');
-  const missedReasonGroup = document.getElementById('missed-reason-group');
-  const outcomeGroup = document.getElementById('outcome-group');
 
-  // Fields hidden for missed trades (P&L, size, outcome, psychology section)
-  const takenOnlyIds = ['trade-pnl','trade-size','trade-risk'];
-  takenOnlyIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.closest('.form-group').style.display = isMissed ? 'none' : '';
-  });
+  // Banner
+  const banner = document.getElementById('missed-banner');
+  if (banner) banner.style.display = isMissed ? 'block' : 'none';
 
-  if (banner)           banner.classList.toggle('hidden', !isMissed);
-  if (missedReasonGroup) missedReasonGroup.style.display = isMissed ? '' : 'none';
-  if (outcomeGroup)     outcomeGroup.style.display = isMissed ? 'none' : '';
+  // Whole Prices & Risk section — hide for missed (no P&L, no entry/exit)
+  const pricesSection = document.getElementById('section-prices-risk');
+  if (pricesSection) pricesSection.style.display = isMissed ? 'none' : '';
 
-  // Hide psychology section for missed trades (no tilt/emotion needed)
-  const psychSection = document.getElementById('trade-tilt')?.closest('.form-section');
+  // Whole Psychology section — hide for missed
+  const psychSection = document.getElementById('section-psychology');
   if (psychSection) psychSection.style.display = isMissed ? 'none' : '';
+
+  // Outcome field — hide for missed
+  const outcomeGroup = document.getElementById('outcome-group');
+  if (outcomeGroup) outcomeGroup.style.display = isMissed ? 'none' : '';
+
+  // Why not taken — show only for missed
+  const missedReasonGroup = document.getElementById('missed-reason-group');
+  if (missedReasonGroup) missedReasonGroup.style.display = isMissed ? 'block' : 'none';
 }
 
 function recalcRR() {
