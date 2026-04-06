@@ -393,7 +393,6 @@ async function loadTradeIntoModal(id) {
     document.getElementById('trade-strategy').value    = trade.strategy || '';
     document.getElementById('trade-timeframe').value   = trade.timeframe || '';
     document.getElementById('trade-session').value     = trade.session || '';
-    document.getElementById('trade-leverage').value    = trade.leverage ?? '';
     document.getElementById('trade-outcome').value     = trade.outcome || 'open';
     document.getElementById('trade-emotion').value     = trade.emotion || '';
     document.getElementById('trade-tags').value        = Array.isArray(trade.tags) ? trade.tags.join(', ') : (trade.tags || '');
@@ -502,7 +501,6 @@ async function handleSaveTrade() {
       strategy:     document.getElementById('trade-strategy').value.trim() || null,
       timeframe:    document.getElementById('trade-timeframe').value || null,
       session:      document.getElementById('trade-session').value || null,
-      leverage:     parseFloatOrNull('trade-leverage'),
       outcome:      document.getElementById('trade-outcome').value || null,
       emotion:      document.getElementById('trade-emotion').value || null,
       tilt_meter:   parseInt(document.getElementById('trade-tilt').value) || null,
