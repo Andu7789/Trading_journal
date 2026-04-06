@@ -596,6 +596,50 @@ select.form-input option {
   background: var(--primary-dim);
 }
 
+/* Trade Type Toggle (Taken / Missed) */
+.trade-type-toggle {
+  display: flex;
+  gap: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  width: fit-content;
+}
+
+.trade-type-btn {
+  padding: 7px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+
+.trade-type-btn.active[data-type="taken"] {
+  background: var(--profit-dim);
+  color: var(--profit);
+}
+
+.trade-type-btn.active[data-type="missed"] {
+  background: var(--warning-dim);
+  color: var(--warning);
+}
+
+.missed-banner {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--warning-dim);
+  border: 1px solid rgba(255,179,71,0.3);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--warning);
+}
+
 /* Screenshot Zone */
 .screenshot-zone {
   border: 2px dashed var(--border-light);
@@ -829,6 +873,7 @@ tbody td {
 .badge-loss   { background: var(--loss-dim);   color: var(--loss);   border: 1px solid rgba(255,71,87,0.2); }
 .badge-open   { background: var(--secondary-dim); color: var(--secondary); border: 1px solid rgba(61,126,240,0.2); }
 .badge-be     { background: rgba(124,141,176,0.1); color: var(--neutral); border: 1px solid rgba(124,141,176,0.2); }
+.badge-missed { background: rgba(255,179,71,0.12); color: var(--warning); border: 1px solid rgba(255,179,71,0.25); }
 .badge-long   { background: var(--profit-dim); color: var(--profit); }
 .badge-short  { background: var(--loss-dim);   color: var(--loss); }
 

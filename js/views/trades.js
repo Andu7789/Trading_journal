@@ -255,7 +255,7 @@ function buildTradeRow(t) {
       <td class="td-mono">${t.take_profit ?? '—'}</td>
       <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
       <td class="td-mono">${t.risk_reward ? t.risk_reward + 'R' : '—'}</td>
-      <td>${getOutcomeBadge(t.outcome)}</td>
+      <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
       <td class="text-sm text-muted">${t.strategy || '—'}</td>
       <td class="text-sm text-muted">${t.timeframe || '—'}</td>
       <td class="td-mono text-sm">${t.tilt_meter ? t.tilt_meter + '/10' : '—'}</td>
@@ -271,6 +271,11 @@ function buildTradeRow(t) {
     <tr id="detail-${t.id}" class="hidden">
       <td colspan="16" style="background:var(--bg-surface);padding:16px 20px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          ${t.trade_type === 'missed' && t.missed_reason ? `
+            <div>
+              <div class="text-xs text-muted mb-8">Why Not Taken</div>
+              <div class="text-sm" style="color:var(--warning)">${t.missed_reason.replace(/_/g,' ')}</div>
+            </div>` : ''}
           ${t.notes ? `
             <div>
               <div class="text-xs text-muted mb-8">Trade Notes</div>

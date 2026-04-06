@@ -104,6 +104,22 @@
           <form id="trade-form" novalidate>
             <input type="hidden" id="trade-id">
 
+            <!-- Trade Type Toggle -->
+            <div class="form-section" style="padding-bottom:16px;margin-bottom:16px">
+              <div class="trade-type-toggle">
+                <button type="button" class="trade-type-btn active" data-type="taken" id="type-taken">
+                  ✅ Trade Taken
+                </button>
+                <button type="button" class="trade-type-btn" data-type="missed" id="type-missed">
+                  👁 Missed / Not Taken
+                </button>
+              </div>
+              <input type="hidden" id="trade-type" value="taken">
+              <div id="missed-banner" class="missed-banner hidden">
+                Logging a setup you <strong>saw but didn't take</strong> — fill in what you observed and why you passed
+              </div>
+            </div>
+
             <!-- Row 1: Core Trade Info -->
             <div class="form-section">
               <h3 class="form-section-title">Trade Details</h3>
@@ -124,7 +140,7 @@
                   </div>
                   <input type="hidden" id="trade-direction">
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="outcome-group">
                   <label class="form-label">Outcome</label>
                   <select id="trade-outcome" class="form-input">
                     <option value="open">Open / Pending</option>
@@ -210,17 +226,19 @@
                     <option value="pre_market">Pre-Market</option>
                   </select>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Leverage</label>
-                  <select id="trade-leverage" class="form-input">
+                <div class="form-group" id="missed-reason-group" style="display:none">
+                  <label class="form-label">Why Not Taken?</label>
+                  <select id="trade-missed-reason" class="form-input">
                     <option value="">Select...</option>
-                    <option value="1">1x</option>
-                    <option value="2">2x</option>
-                    <option value="5">5x</option>
-                    <option value="10">10x</option>
-                    <option value="20">20x</option>
-                    <option value="50">50x</option>
-                    <option value="100">100x</option>
+                    <option value="missed_entry">Missed the entry</option>
+                    <option value="no_confidence">Lacked confidence</option>
+                    <option value="already_in_trade">Already in a trade</option>
+                    <option value="risk_limit">Hit daily risk limit</option>
+                    <option value="news_event">News event risk</option>
+                    <option value="not_at_desk">Not at desk</option>
+                    <option value="ignored_signal">Ignored the signal</option>
+                    <option value="too_late">Spotted too late</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
               </div>

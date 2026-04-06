@@ -35,6 +35,10 @@ CREATE TABLE IF NOT EXISTS public.trades (
   timeframe       VARCHAR(10),
   session         VARCHAR(20),
 
+  -- Trade type
+  trade_type      VARCHAR(10) DEFAULT 'taken' CHECK (trade_type IN ('taken', 'missed')),
+  missed_reason   VARCHAR(30),
+
   -- Psychology (Tilt Meter)
   tilt_meter      SMALLINT CHECK (tilt_meter BETWEEN 1 AND 10),
   emotion         VARCHAR(30),

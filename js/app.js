@@ -185,6 +185,16 @@ function setupTradeModal() {
   if (backdrop)  backdrop.onclick  = closeTradeModal;
   if (saveBtn)   saveBtn.onclick   = handleSaveTrade;
 
+  // Trade type toggle (Taken / Missed)
+  document.querySelectorAll('.trade-type-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.trade-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('trade-type').value = btn.dataset.type;
+      applyTradeTypeUI(btn.dataset.type);
+    };
+  });
+
   // Direction toggle
   document.querySelectorAll('.dir-btn').forEach(btn => {
     btn.onclick = () => {
@@ -213,6 +223,28 @@ function setupTradeModal() {
 
   // Screenshot upload
   setupScreenshotZone();
+}
+
+function applyTradeTypeUI(type) {
+  const isMissed = type === 'missed';
+  const banner   = document.getElementById('missed-banner');
+  const missedReasonGroup = document.getElementById('missed-reason-group');
+  const outcomeGroup = document.getElementById('outcome-group');
+
+  // Fields hidden for missed trades (P&L, size, outcome, psychology section)
+  const takenOnlyIds = ['trade-pnl','trade-size','trade-risk'];
+  takenOnlyIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.closest('.form-group').style.display = isMissed ? 'none' : '';
+  });
+
+  if (banner)           banner.classList.toggle('hidden', !isMissed);
+  if (missedReasonGroup) missedReasonGroup.style.display = isMissed ? '' : 'none';
+  if (outcomeGroup)     outcomeGroup.style.display = isMissed ? 'none' : '';
+
+  // Hide psychology section for missed trades (no tilt/emotion needed)
+  const psychSection = document.getElementById('trade-tilt')?.closest('.form-section');
+  if (psychSection) psychSection.style.display = isMissed ? 'none' : '';
 }
 
 function recalcRR() {
@@ -306,6 +338,12 @@ export function openTradeModal(id = null, date = null, callback = null) {
   if (previews) previews.innerHTML = '';
   if (prompt)   prompt.style.display = '';
 
+  // Reset trade type to "taken"
+  document.querySelectorAll('.trade-type-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('type-taken')?.classList.add('active');
+  document.getElementById('trade-type').value = 'taken';
+  applyTradeTypeUI('taken');
+
   // Default date
   document.getElementById('trade-date').value = date || todayString();
 
@@ -331,6 +369,14 @@ async function loadTradeIntoModal(id) {
     if (!trade) return;
 
     document.getElementById('trade-id').value         = trade.id;
+
+    // Restore trade type toggle
+    const tradeType = trade.trade_type || 'taken';
+    document.querySelectorAll('.trade-type-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.trade-type-btn[data-type="${tradeType}"]`)?.classList.add('active');
+    document.getElementById('trade-type').value = tradeType;
+    applyTradeTypeUI(tradeType);
+
     document.getElementById('trade-date').value        = trade.date || '';
     document.getElementById('trade-symbol').value      = trade.symbol || '';
     document.getElementById('trade-direction').value   = trade.direction || '';
@@ -351,7 +397,8 @@ async function loadTradeIntoModal(id) {
     document.getElementById('trade-tags').value        = Array.isArray(trade.tags) ? trade.tags.join(', ') : (trade.tags || '');
     document.getElementById('trade-notes').value       = trade.notes || '';
     document.getElementById('trade-mistakes').value    = trade.mistakes || '';
-    document.getElementById('trade-mistake-type').value = trade.mistake_type || '';
+    document.getElementById('trade-mistake-type').value  = trade.mistake_type || '';
+    document.getElementById('trade-missed-reason').value = trade.missed_reason || '';
 
     // Direction button
     if (trade.direction) {
@@ -410,8 +457,9 @@ async function handleSaveTrade() {
   const symbol  = document.getElementById('trade-symbol').value.trim();
   const direction = document.getElementById('trade-direction').value;
 
-  if (!symbol)    { showToast('Symbol is required', 'error'); return; }
-  if (!direction) { showToast('Select Long or Short', 'error'); return; }
+  const tradeType = document.getElementById('trade-type').value || 'taken';
+  if (!symbol)                        { showToast('Symbol is required', 'error'); return; }
+  if (!direction && tradeType !== 'missed') { showToast('Select Long or Short', 'error'); return; }
 
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving...';
@@ -457,6 +505,8 @@ async function handleSaveTrade() {
       emotion:      document.getElementById('trade-emotion').value || null,
       tilt_meter:   parseInt(document.getElementById('trade-tilt').value) || null,
       followed_plan: followedPlan || null,
+      trade_type:    document.getElementById('trade-type').value || 'taken',
+      missed_reason: document.getElementById('trade-missed-reason').value || null,
       mistake_type:  document.getElementById('trade-mistake-type').value || null,
       tags:          document.getElementById('trade-tags').value,
       notes:         document.getElementById('trade-notes').value.trim() || null,

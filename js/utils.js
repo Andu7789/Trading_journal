@@ -146,7 +146,8 @@ export function calcStats(trades) {
   };
 }
 
-export function getOutcomeBadge(outcome) {
+export function getOutcomeBadge(outcome, tradeType) {
+  if (tradeType === 'missed') return '<span class="badge badge-missed">MISSED</span>';
   const map = {
     win:        '<span class="badge badge-profit">WIN</span>',
     loss:       '<span class="badge badge-loss">LOSS</span>',

@@ -240,7 +240,7 @@ function buildTradesTable(trades, date) {
               <td class="td-mono">${t.entry_price ?? '—'}</td>
               <td class="td-mono">${t.exit_price ?? '—'}</td>
               <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
-              <td>${getOutcomeBadge(t.outcome)}</td>
+              <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
               <td class="text-muted text-sm">${t.strategy || '—'}</td>
               <td class="td-mono">${t.tilt_meter ? `<span class="text-sm" style="color:var(--text-secondary)">${t.tilt_meter}/10</span>` : '—'}</td>
               <td>
