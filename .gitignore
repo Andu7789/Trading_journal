@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
+*.swo
+
+# Environment / secrets
+.env
+.env.local
+config.local.js
+
+# Node (if added later)
+node_modules/
+package-lock.json

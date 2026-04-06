@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TradeJournal Pro</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+  <div id="app">
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-icon">TJ</div>
+          <div class="brand-text">
+            <span class="brand-name">TradeJournal</span>
+            <span class="brand-sub">Pro</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-nav">
+        <a href="#dashboard" class="nav-item active" data-view="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Dashboard</span>
+        </a>
+        <a href="#journal" class="nav-item" data-view="journal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          <span>Daily Journal</span>
+        </a>
+        <a href="#trades" class="nav-item" data-view="trades">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>Trade Log</span>
+        </a>
+        <a href="#weekly" class="nav-item" data-view="weekly">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>Weekly Review</span>
+        </a>
+        <a href="#analytics" class="nav-item" data-view="analytics">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>Analytics</span>
+        </a>
+        <a href="#playbook" class="nav-item" data-view="playbook">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span>Playbook</span>
+        </a>
+      </div>
+
+      <div class="sidebar-footer">
+        <div id="connection-status" class="conn-status disconnected">
+          <span class="conn-dot"></span>
+          <span class="conn-text">Not Connected</span>
+        </div>
+        <a href="#settings" class="nav-item" data-view="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Settings</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="sidebar-toggle" id="sidebar-toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <div class="page-title" id="page-title">Dashboard</div>
+        </div>
+        <div class="topbar-right">
+          <div class="topbar-date" id="topbar-date"></div>
+          <button class="btn btn-primary btn-sm" id="add-trade-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Trade
+          </button>
+        </div>
+      </header>
+
+      <main id="main-content" class="main-content">
+        <div class="loading-screen">
+          <div class="loading-spinner"></div>
+          <p>Loading...</p>
+        </div>
+      </main>
+    </div>
+
+    <!-- ===== TRADE MODAL ===== -->
+    <div id="trade-modal" class="modal hidden">
+      <div class="modal-backdrop" id="trade-modal-backdrop"></div>
+      <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+          <h2 id="trade-modal-title">Add Trade</h2>
+          <button class="modal-close" id="close-trade-modal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form id="trade-form" novalidate>
+            <input type="hidden" id="trade-id">
+
+            <!-- Row 1: Core Trade Info -->
+            <div class="form-section">
+              <h3 class="form-section-title">Trade Details</h3>
+              <div class="form-grid-4">
+                <div class="form-group">
+                  <label class="form-label required">Symbol</label>
+                  <input type="text" id="trade-symbol" class="form-input" placeholder="EUR/USD, BTC/USDT..." required autocomplete="off">
+                </div>
+                <div class="form-group">
+                  <label class="form-label required">Date</label>
+                  <input type="date" id="trade-date" class="form-input" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label required">Direction</label>
+                  <div class="direction-toggle">
+                    <button type="button" class="dir-btn" data-dir="long" id="dir-long">▲ LONG</button>
+                    <button type="button" class="dir-btn" data-dir="short" id="dir-short">▼ SHORT</button>
+                  </div>
+                  <input type="hidden" id="trade-direction">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Outcome</label>
+                  <select id="trade-outcome" class="form-input">
+                    <option value="open">Open / Pending</option>
+                    <option value="win">Win</option>
+                    <option value="loss">Loss</option>
+                    <option value="breakeven">Breakeven</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: Prices -->
+            <div class="form-section">
+              <h3 class="form-section-title">Prices & Risk</h3>
+              <div class="form-grid-4">
+                <div class="form-group">
+                  <label class="form-label">Entry Price</label>
+                  <input type="number" id="trade-entry" class="form-input" step="any" placeholder="0.00000">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Exit Price</label>
+                  <input type="number" id="trade-exit" class="form-input" step="any" placeholder="0.00000">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Stop Loss</label>
+                  <input type="number" id="trade-sl" class="form-input" step="any" placeholder="0.00000">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Take Profit</label>
+                  <input type="number" id="trade-tp" class="form-input" step="any" placeholder="0.00000">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Size / Lots</label>
+                  <input type="number" id="trade-size" class="form-input" step="any" placeholder="0.01">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">P&amp;L ($)</label>
+                  <input type="number" id="trade-pnl" class="form-input" step="any" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Risk ($)</label>
+                  <input type="number" id="trade-risk" class="form-input" step="any" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">R:R Planned</label>
+                  <input type="number" id="trade-rr" class="form-input" step="any" placeholder="2.0" readonly>
+                  <span class="form-hint">Auto-calculated</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 3: Context -->
+            <div class="form-section">
+              <h3 class="form-section-title">Trade Context</h3>
+              <div class="form-grid-4">
+                <div class="form-group">
+                  <label class="form-label">Strategy</label>
+                  <input type="text" id="trade-strategy" class="form-input" placeholder="Breakout, Reversal..." list="strategy-list" autocomplete="off">
+                  <datalist id="strategy-list"></datalist>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Timeframe</label>
+                  <select id="trade-timeframe" class="form-input">
+                    <option value="">Select...</option>
+                    <option value="M1">M1</option>
+                    <option value="M5">M5</option>
+                    <option value="M15">M15</option>
+                    <option value="M30">M30</option>
+                    <option value="H1">H1</option>
+                    <option value="H4">H4</option>
+                    <option value="D1">D1</option>
+                    <option value="W1">W1</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Session</label>
+                  <select id="trade-session" class="form-input">
+                    <option value="">Select...</option>
+                    <option value="asian">Asian</option>
+                    <option value="london">London</option>
+                    <option value="new_york">New York</option>
+                    <option value="overlap">London/NY Overlap</option>
+                    <option value="pre_market">Pre-Market</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Leverage</label>
+                  <select id="trade-leverage" class="form-input">
+                    <option value="">Select...</option>
+                    <option value="1">1x</option>
+                    <option value="2">2x</option>
+                    <option value="5">5x</option>
+                    <option value="10">10x</option>
+                    <option value="20">20x</option>
+                    <option value="50">50x</option>
+                    <option value="100">100x</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 4: Psychology (Tilt Meter) -->
+            <div class="form-section">
+              <h3 class="form-section-title">Psychology</h3>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">Mental State (Tilt Meter)</label>
+                  <div class="tilt-meter">
+                    <input type="range" id="trade-tilt" min="1" max="10" value="7" class="tilt-slider">
+                    <div class="tilt-labels">
+                      <span>1 – Tilted</span>
+                      <span id="tilt-value" class="tilt-display">7 – Good</span>
+                      <span>10 – Peak</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Emotion at Entry</label>
+                  <select id="trade-emotion" class="form-input">
+                    <option value="">Select...</option>
+                    <option value="calm">Calm &amp; Focused</option>
+                    <option value="confident">Confident</option>
+                    <option value="anxious">Anxious</option>
+                    <option value="fearful">Fearful</option>
+                    <option value="greedy">Greedy</option>
+                    <option value="frustrated">Frustrated / Frustrated</option>
+                    <option value="fomo">FOMO</option>
+                    <option value="revenge">Revenge Trading</option>
+                    <option value="bored">Bored</option>
+                    <option value="overconfident">Overconfident</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">Followed Plan?</label>
+                  <div class="radio-group">
+                    <label class="radio-option"><input type="radio" name="followed-plan" value="yes" id="plan-yes"><span>Yes — Executed perfectly</span></label>
+                    <label class="radio-option"><input type="radio" name="followed-plan" value="partial" id="plan-partial"><span>Partially</span></label>
+                    <label class="radio-option"><input type="radio" name="followed-plan" value="no" id="plan-no"><span>No — Rule break</span></label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Mistake Type</label>
+                  <select id="trade-mistake-type" class="form-input">
+                    <option value="">No mistake</option>
+                    <option value="cut_winners_short">Cut winner short</option>
+                    <option value="held_loser">Held loser too long</option>
+                    <option value="overtraded">Overtraded</option>
+                    <option value="no_setup">Entered without setup</option>
+                    <option value="revenge">Revenge trade</option>
+                    <option value="fomo_entry">FOMO entry</option>
+                    <option value="moved_sl">Moved stop loss</option>
+                    <option value="early_exit">Exited early on fear</option>
+                    <option value="late_entry">Late / chased entry</option>
+                    <option value="oversize">Oversized position</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 5: Notes -->
+            <div class="form-section">
+              <h3 class="form-section-title">Notes</h3>
+              <div class="form-group">
+                <label class="form-label">Tags</label>
+                <input type="text" id="trade-tags" class="form-input" placeholder="breakout, confluence, news-trade (comma separated)">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Trade Notes — What was your setup? What did you see?</label>
+                <textarea id="trade-notes" class="form-textarea" rows="3" placeholder="Describe your trade setup, the reason for entry, what confluences you identified..."></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Mistakes / Deviations from Plan</label>
+                <textarea id="trade-mistakes" class="form-textarea" rows="2" placeholder="Did you deviate from your plan? What would you do differently?"></textarea>
+              </div>
+            </div>
+
+            <!-- Row 6: Screenshots -->
+            <div class="form-section">
+              <h3 class="form-section-title">Screenshots</h3>
+              <div class="screenshot-zone" id="screenshot-zone">
+                <input type="file" id="screenshot-input" multiple accept="image/*" style="display:none">
+                <div class="upload-prompt" id="upload-prompt">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <p>Drag &amp; drop screenshots here or <span class="upload-link">click to browse</span></p>
+                  <p class="upload-hint">PNG, JPG, WebP supported</p>
+                </div>
+                <div id="screenshot-previews" class="screenshot-previews"></div>
+              </div>
+            </div>
+
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" id="cancel-trade-modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="save-trade-btn">Save Trade</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== VIEW SCREENSHOT MODAL ===== -->
+    <div id="image-modal" class="modal hidden">
+      <div class="modal-backdrop" id="image-modal-backdrop"></div>
+      <div class="image-modal-content">
+        <button class="modal-close image-close" id="close-image-modal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <img id="modal-image" src="" alt="Trade screenshot">
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+  </div><!-- #app -->
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
