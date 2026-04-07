@@ -162,23 +162,27 @@ function renderSetupScreen() {
 function setupSidebarToggle() {
   const toggle  = document.getElementById('sidebar-toggle');
   const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
   if (!toggle || !sidebar) return;
 
-  toggle.onclick = () => sidebar.classList.toggle('open');
+  function openSidebar() {
+    sidebar.classList.add('open');
+    if (overlay) overlay.classList.add('active');
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('active');
+  }
+
+  toggle.onclick = () => sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+
+  // Close when overlay (outside) is tapped
+  if (overlay) overlay.onclick = closeSidebar;
 
   // Close when a nav item is tapped
   sidebar.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => sidebar.classList.remove('open'));
-  });
-
-  // Close when tapping outside the sidebar
-  document.addEventListener('click', (e) => {
-    if (sidebar.classList.contains('open') &&
-        !sidebar.contains(e.target) &&
-        e.target !== toggle &&
-        !toggle.contains(e.target)) {
-      sidebar.classList.remove('open');
-    }
+    item.addEventListener('click', closeSidebar);
   });
 }
 

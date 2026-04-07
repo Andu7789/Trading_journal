@@ -180,6 +180,16 @@ body {
 .conn-status.disconnected .conn-dot { background: var(--text-muted); }
 .conn-status.connected .conn-text { color: var(--profit); }
 
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 99;
+}
+
+.sidebar-overlay.active { display: block; }
+
 .main-wrapper {
   flex: 1;
   margin-left: var(--sidebar-width);
