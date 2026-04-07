@@ -162,9 +162,24 @@ function renderSetupScreen() {
 function setupSidebarToggle() {
   const toggle  = document.getElementById('sidebar-toggle');
   const sidebar = document.getElementById('sidebar');
-  if (toggle && sidebar) {
-    toggle.onclick = () => sidebar.classList.toggle('open');
-  }
+  if (!toggle || !sidebar) return;
+
+  toggle.onclick = () => sidebar.classList.toggle('open');
+
+  // Close when a nav item is tapped
+  sidebar.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => sidebar.classList.remove('open'));
+  });
+
+  // Close when tapping outside the sidebar
+  document.addEventListener('click', (e) => {
+    if (sidebar.classList.contains('open') &&
+        !sidebar.contains(e.target) &&
+        e.target !== toggle &&
+        !toggle.contains(e.target)) {
+      sidebar.classList.remove('open');
+    }
+  });
 }
 
 // =============================================
