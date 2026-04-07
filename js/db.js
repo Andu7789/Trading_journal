@@ -1,12 +1,14 @@
 // =============================================
 //  DATABASE — Supabase wrapper
 // =============================================
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 
 let _client = null;
 
 export function initSupabase() {
-  const url = localStorage.getItem('tj_supabase_url');
-  const key = localStorage.getItem('tj_supabase_key');
+  // Config file takes priority; localStorage used as override from Settings page
+  const url = SUPABASE_URL || localStorage.getItem('tj_supabase_url');
+  const key = SUPABASE_KEY || localStorage.getItem('tj_supabase_key');
   if (!url || !key) return false;
   try {
     _client = window.supabase.createClient(url, key);
