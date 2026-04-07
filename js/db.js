@@ -123,6 +123,9 @@ export async function saveJournalEntry(entryData) {
   const { id, ...data } = entryData;
   data.updated_at = new Date().toISOString();
 
+  // Convert empty strings to null for constrained columns
+  if (!data.market_bias) data.market_bias = null;
+
   const { data: result, error } = await _client
     .from('journal_entries')
     .upsert(data, { onConflict: 'date' })
