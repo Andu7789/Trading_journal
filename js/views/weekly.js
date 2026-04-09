@@ -240,7 +240,7 @@ function buildScreenshots(trades) {
 
 function buildJournalSummary(journal) {
   const sections = [
-    { label: 'Market Bias', icon: '🧭', val: journal.market_bias ? `<span class="badge badge-${journal.market_bias === 'bullish' ? 'profit' : journal.market_bias === 'bearish' ? 'loss' : 'open'}">${journal.market_bias.toUpperCase()}</span>` : null },
+    { label: 'Market Bias', icon: '🧭', val: journal.market_bias ? `<span class="badge badge-${journal.market_bias === 'bullish' ? 'profit' : journal.market_bias === 'bearish' ? 'loss' : 'open'}">${journal.market_bias.toUpperCase()}</span>` : null, raw: true },
     { label: 'Daily Goals', icon: '🎯', val: journal.daily_goals },
     { label: 'What went well', icon: '✅', val: journal.what_went_well },
     { label: 'What went wrong', icon: '⚠️', val: journal.what_went_wrong },
@@ -262,7 +262,7 @@ function buildJournalSummary(journal) {
         ${sections.map(s => `
           <div>
             <div class="text-xs text-muted mb-8">${s.icon} ${s.label}</div>
-            <div class="text-sm" style="line-height:1.6;color:var(--text-secondary)">${nl2br(String(s.val))}</div>
+            <div class="text-sm" style="line-height:1.6;color:var(--text-secondary)">${s.raw ? s.val : nl2br(String(s.val))}</div>
           </div>
         `).join('')}
       </div>
