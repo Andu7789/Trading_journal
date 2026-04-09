@@ -107,9 +107,23 @@ function buildJournalBody(date, entry, trades, prevEntry) {
         </div>
         <div class="journal-section-body">
           ${prevEntry?.tomorrow_focus ? `
-          <div style="background:var(--secondary-dim);border:1px solid rgba(61,126,240,0.25);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px">
-            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:var(--secondary);margin-bottom:6px">🔭 Yesterday's Focus — did you stick to this?</div>
-            <div style="font-size:13px;color:var(--text-secondary);line-height:1.6">${nl2br(prevEntry.tomorrow_focus)}</div>
+          <div style="
+            background: linear-gradient(135deg, rgba(61,126,240,0.15), rgba(0,212,192,0.08));
+            border: 1px solid rgba(61,126,240,0.4);
+            border-left: 4px solid var(--secondary);
+            border-radius: var(--radius-lg);
+            padding: 18px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px rgba(61,126,240,0.15);
+          ">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span style="font-size:18px">🔭</span>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:var(--secondary);letter-spacing:0.3px">Yesterday's Focus</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:1px">Did you stick to this today?</div>
+              </div>
+            </div>
+            <div style="font-size:14px;color:var(--text-primary);line-height:1.7;font-style:italic">${nl2br(prevEntry.tomorrow_focus)}</div>
           </div>` : ''}
           <div class="form-group">
             <label class="form-label">Market Bias</label>
