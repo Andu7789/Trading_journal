@@ -51,18 +51,20 @@ async function loadJournalDay(date) {
   body.innerHTML = `<div class="loading-screen"><div class="loading-spinner"></div></div>`;
 
   try {
-    const [entry, trades] = await Promise.all([
+    const yesterday = addDays(date, -1);
+    const [entry, trades, prevEntry] = await Promise.all([
       getJournalEntry(date),
-      getTrades({ date })
+      getTrades({ date }),
+      getJournalEntry(yesterday)
     ]);
-    body.innerHTML = buildJournalBody(date, entry || {}, trades);
+    body.innerHTML = buildJournalBody(date, entry || {}, trades, prevEntry);
     initJournalInteractions(date, entry || {});
   } catch (err) {
     body.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
   }
 }
 
-function buildJournalBody(date, entry, trades) {
+function buildJournalBody(date, entry, trades, prevEntry) {
   const stats = calcStats(trades);
   const isToday = date === todayString();
   const dayLabel = formatDateLong(date);
@@ -93,6 +95,11 @@ function buildJournalBody(date, entry, trades) {
           <span class="chevron">▾</span>
         </div>
         <div class="journal-section-body">
+          ${prevEntry?.tomorrow_focus ? `
+          <div style="background:var(--secondary-dim);border:1px solid rgba(61,126,240,0.25);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:var(--secondary);margin-bottom:6px">🔭 Yesterday's Focus — did you stick to this?</div>
+            <div style="font-size:13px;color:var(--text-secondary);line-height:1.6">${nl2br(prevEntry.tomorrow_focus)}</div>
+          </div>` : ''}
           <div class="form-group">
             <label class="form-label">Market Bias</label>
             <div class="bias-buttons">
@@ -102,10 +109,6 @@ function buildJournalBody(date, entry, trades) {
               <button class="bias-btn ${entry.market_bias === 'mixed' ? 'active' : ''}" data-bias="mixed">⚡ Mixed</button>
             </div>
             <input type="hidden" id="j-bias" value="${entry.market_bias || ''}">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Key Levels to Watch</label>
-            <textarea id="j-key-levels" class="form-textarea" rows="2" placeholder="Key support/resistance levels, pivot points...">${entry.key_levels || ''}</textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Economic Events Today</label>
@@ -307,7 +310,7 @@ function initJournalInteractions(date, entry) {
   });
 
   // Text areas — auto-save on change
-  const textFields = ['j-key-levels','j-economic','j-goals','j-went-well','j-went-wrong','j-lessons','j-tomorrow','j-notes'];
+  const textFields = ['j-economic','j-goals','j-went-well','j-went-wrong','j-lessons','j-tomorrow','j-notes'];
   textFields.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -323,7 +326,6 @@ function getJournalData(date) {
   return {
     date,
     market_bias:      getValue('j-bias'),
-    key_levels:       getValue('j-key-levels'),
     economic_events:  getValue('j-economic'),
     daily_goals:      getValue('j-goals'),
     what_went_well:   getValue('j-went-well'),
