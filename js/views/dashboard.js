@@ -80,7 +80,7 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
       <div class="stat-card warning">
         <div class="stat-label">Best Trade (Month)</div>
         <div class="stat-value neutral text-profit">${monthStats.total ? formatCurrency(monthStats.bestTrade) : '—'}</div>
-        <div class="stat-sub">Worst: ${monthStats.total ? formatCurrency(monthStats.worstTrade) : '—'}</div>
+        <div class="stat-sub">${monthStats.worstTrade < 0 ? 'Worst' : 'Smallest'}: ${monthStats.total ? formatCurrency(monthStats.worstTrade) : '—'}</div>
       </div>
     </div>
 

@@ -122,11 +122,11 @@ function buildAnalyticsLayout(trades) {
         <div class="stat-sub">Ratio: ${stats.avgLoss ? (stats.avgWin / stats.avgLoss).toFixed(2) : '—'}x</div>
       </div>
       <div class="stat-card warning">
-        <div class="stat-label">Best / Worst Trade</div>
+        <div class="stat-label">Best / ${stats.worstTrade < 0 ? 'Worst' : 'Smallest'} Trade</div>
         <div class="stat-value neutral" style="font-size:16px">
           <span class="text-profit">${formatCurrency(stats.bestTrade)}</span>
           <span style="color:var(--border-light)"> / </span>
-          <span class="text-loss">${formatCurrency(stats.worstTrade)}</span>
+          <span class="${stats.worstTrade < 0 ? 'text-loss' : 'text-profit'}">${formatCurrency(stats.worstTrade)}</span>
         </div>
         <div class="stat-sub">Expected value: ${formatCurrency(stats.total ? stats.totalPnl / stats.total : 0)}/trade</div>
       </div>

@@ -162,7 +162,7 @@ async function loadTrades() {
         <div class="stat-card warning">
           <div class="stat-label">Best Trade</div>
           <div class="stat-value neutral text-profit">${stats.total ? formatCurrency(stats.bestTrade) : '—'}</div>
-          <div class="stat-sub">Worst: ${stats.total ? formatCurrency(stats.worstTrade) : '—'}</div>
+          <div class="stat-sub">${stats.worstTrade < 0 ? 'Worst' : 'Smallest'}: ${stats.total ? formatCurrency(stats.worstTrade) : '—'}</div>
         </div>
       `;
     }
