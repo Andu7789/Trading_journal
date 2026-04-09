@@ -45,7 +45,10 @@ export function formatDateShort(dateStr) {
 
 export function todayString() {
   const d = new Date();
-  return d.toISOString().split('T')[0]; // YYYY-MM-DD
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function formatDisplayDate(dateStr) {
@@ -74,7 +77,11 @@ export function getWeekRange(date) {
 export function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().split('T')[0];
+  // Use local date parts to avoid UTC offset shifting the date
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function getMonthRange(year, month) {
