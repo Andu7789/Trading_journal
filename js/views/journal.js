@@ -20,21 +20,22 @@ export async function renderJournal(container, dateParam) {
     currentDate = todayString();
   }
 
+  // Expose nav functions globally so inline handlers work reliably
+  window._journalPrev   = () => navigateDate(-1);
+  window._journalNext   = () => navigateDate(1);
+  window._journalToday  = () => navigateDate(0, todayString());
+  window._journalPickDate = (val) => navigateDate(0, val);
+
   container.innerHTML = `
     <div class="journal-date-nav">
-      <button class="journal-nav-btn" id="journal-prev">‹ Prev</button>
-      <input type="date" id="journal-date-picker" value="${currentDate}">
-      <button class="journal-nav-btn" id="journal-next">Next ›</button>
-      <button class="btn btn-ghost btn-sm" id="journal-today-btn">Today</button>
+      <button class="journal-nav-btn" onclick="window._journalPrev()">‹ Prev</button>
+      <input type="date" id="journal-date-picker" value="${currentDate}" onchange="window._journalPickDate(this.value)">
+      <button class="journal-nav-btn" onclick="window._journalNext()">Next ›</button>
+      <button class="btn btn-ghost btn-sm" onclick="window._journalToday()">Today</button>
       <span id="autosave-indicator" class="autosave-indicator"></span>
     </div>
     <div id="journal-body"><div class="loading-screen"><div class="loading-spinner"></div></div></div>
   `;
-
-  document.getElementById('journal-prev').onclick  = () => navigateDate(-1);
-  document.getElementById('journal-next').onclick  = () => navigateDate(1);
-  document.getElementById('journal-today-btn').onclick = () => navigateDate(0, todayString());
-  document.getElementById('journal-date-picker').onchange = (e) => navigateDate(0, e.target.value);
 
   await loadJournalDay(currentDate);
 }
@@ -69,6 +70,7 @@ async function loadJournalDay(date) {
     body.innerHTML = buildJournalBody(date, entry || {}, trades, prevEntry);
     initJournalInteractions(date, entry || {});
   } catch (err) {
+    console.error('Journal load error:', err);
     body.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
   }
 }
