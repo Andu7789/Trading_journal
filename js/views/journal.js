@@ -13,7 +13,12 @@ let pendingSave = false;
 
 export async function renderJournal(container, dateParam) {
   document.getElementById('page-title').textContent = 'Daily Journal';
-  if (dateParam) currentDate = dateParam;
+  // Always ensure currentDate is valid YYYY-MM-DD
+  if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    currentDate = dateParam;
+  } else if (!currentDate || !/^\d{4}-\d{2}-\d{2}$/.test(currentDate)) {
+    currentDate = todayString();
+  }
 
   container.innerHTML = `
     <div class="journal-date-nav">
@@ -36,11 +41,15 @@ export async function renderJournal(container, dateParam) {
 
 async function navigateDate(offset, exact) {
   if (exact) {
-    currentDate = exact;
+    // Validate it's a proper YYYY-MM-DD string before accepting
+    if (/^\d{4}-\d{2}-\d{2}$/.test(exact)) {
+      currentDate = exact;
+    }
   } else {
     currentDate = addDays(currentDate, offset);
   }
-  document.getElementById('journal-date-picker').value = currentDate;
+  const picker = document.getElementById('journal-date-picker');
+  if (picker) picker.value = currentDate;
   await loadJournalDay(currentDate);
 }
 
