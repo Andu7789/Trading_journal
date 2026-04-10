@@ -12,7 +12,8 @@ import { renderTrades }    from './views/trades.js';
 import { renderWeekly }    from './views/weekly.js';
 import { renderAnalytics } from './views/analytics.js';
 import { renderSettings }  from './views/settings.js';
-import { renderPlaybook }  from './views/playbook.js';
+import { renderPlaybook }         from './views/playbook.js';
+import { renderStrategyTracker } from './views/strategy-tracker.js';
 
 // ---- Module state ----
 let currentView    = null;
@@ -90,7 +91,7 @@ function setupNavigation() {
     const parts = link.getAttribute('href').slice(1).split('?');
     const view  = parts[0];
     const params = Object.fromEntries(new URLSearchParams(parts[1] || ''));
-    if (['dashboard','journal','trades','weekly','analytics','settings','playbook'].includes(view)) {
+    if (['dashboard','journal','trades','weekly','analytics','settings','playbook','strategy-tracker'].includes(view)) {
       e.preventDefault();
       history.pushState(null, '', `#${view}`);
       navigate(view, params);
@@ -109,7 +110,8 @@ async function navigate(view, params = {}) {
   // Page title map
   const titles = {
     dashboard: 'Dashboard', journal: 'Daily Journal', trades: 'Trade Log',
-    weekly: 'Weekly Review', analytics: 'Analytics', settings: 'Settings', playbook: 'Playbook'
+    weekly: 'Weekly Review', analytics: 'Analytics', settings: 'Settings', playbook: 'Playbook',
+    'strategy-tracker': 'Strategy Tracker'
   };
   document.getElementById('page-title').textContent = titles[view] || view;
 
@@ -130,8 +132,9 @@ async function navigate(view, params = {}) {
       case 'weekly':     await renderWeekly(container); break;
       case 'analytics':  await renderAnalytics(container); break;
       case 'settings':   await renderSettings(container); break;
-      case 'playbook':   await renderPlaybook(container); break;
-      default:           await renderDashboard(container);
+      case 'playbook':          await renderPlaybook(container); break;
+      case 'strategy-tracker': await renderStrategyTracker(container); break;
+      default:                 await renderDashboard(container);
     }
   } catch (err) {
     container.innerHTML = `

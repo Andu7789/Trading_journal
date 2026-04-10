@@ -191,6 +191,61 @@ export async function deleteScreenshot(url) {
 }
 
 // =============================================
+//  STRATEGY SETUPS
+// =============================================
+
+export async function getStrategySetups(filters = {}) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  let query = _client
+    .from('strategy_setups')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (filters.startDate) query = query.gte('date', filters.startDate);
+  if (filters.endDate)   query = query.lte('date', filters.endDate);
+  if (filters.pair)      query = query.eq('pair', filters.pair);
+  if (filters.outcome)   query = query.eq('outcome', filters.outcome);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveStrategySetup(setupData) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  const { id, ...data } = setupData;
+  data.updated_at = new Date().toISOString();
+
+  if (id) {
+    const { data: result, error } = await _client
+      .from('strategy_setups')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
+  } else {
+    const { data: result, error } = await _client
+      .from('strategy_setups')
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
+  }
+}
+
+export async function deleteStrategySetup(id) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { error } = await _client.from('strategy_setups').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// =============================================
 //  PLAYBOOK
 // =============================================
 
