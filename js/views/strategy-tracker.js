@@ -398,7 +398,7 @@ async function confirmDeleteSetup(id) {
 function buildSetupModal() {
   return `
     <div id="st-modal-backdrop" class="modal-backdrop hidden" style="position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.6)"></div>
-    <div id="st-modal" class="modal hidden" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;width:min(540px,95vw);max-height:90vh;overflow-y:auto">
+    <div id="st-modal" class="modal hidden" style="position:fixed;top:5vh;left:50%;transform:translateX(-50%);z-index:1000;width:min(540px,95vw);max-height:90vh;overflow-y:auto">
       <div class="modal-header">
         <h3 id="st-modal-title">Add Setup</h3>
         <button class="modal-close" id="st-modal-close">×</button>
@@ -609,8 +609,8 @@ async function handleSaveSetup() {
 // =============================================
 function buildPairModal() {
   return `
-    <div id="st-pair-modal-backdrop" class="modal-backdrop hidden" style="position:fixed;inset:0;z-index:999"></div>
-    <div id="st-pair-modal" class="modal hidden" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;width:min(400px,95vw)">
+    <div id="st-pair-modal-backdrop" class="modal-backdrop hidden" style="position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.6)"></div>
+    <div id="st-pair-modal" class="modal hidden" style="position:fixed;top:5vh;left:50%;transform:translateX(-50%);z-index:1000;width:min(400px,95vw);max-height:90vh;overflow-y:auto">
       <div class="modal-header">
         <h3>Manage Pairs</h3>
         <button class="modal-close" id="st-pair-modal-close">×</button>
