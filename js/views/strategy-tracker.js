@@ -36,6 +36,7 @@ export async function renderStrategyTracker(container) {
   }
 
   container.innerHTML = buildShell();
+  ensureModalsInDom();
   wireShell();
   await loadAll();
 }
@@ -76,12 +77,6 @@ function buildShell() {
     <div id="st-week-content">
       <div class="loading-screen"><div class="loading-spinner"></div></div>
     </div>
-
-    <!-- Setup modal (hidden) -->
-    ${buildSetupModal()}
-
-    <!-- Pair management modal (hidden) -->
-    ${buildPairModal()}
   `;
 }
 
@@ -101,20 +96,6 @@ function wireShell() {
     currentWeekStart = getWeekRange(todayString()).start;
     loadWeek();
   };
-
-  // Modal wiring
-  document.getElementById('st-modal-backdrop').onclick  = closeSetupModal;
-  document.getElementById('st-modal-close').onclick     = closeSetupModal;
-  document.getElementById('st-modal-cancel').onclick    = closeSetupModal;
-  document.getElementById('st-modal-save').onclick      = handleSaveSetup;
-
-  // Pair modal wiring
-  document.getElementById('st-pair-modal-backdrop').onclick = closePairModal;
-  document.getElementById('st-pair-modal-close').onclick    = closePairModal;
-  document.getElementById('st-pair-add-btn').onclick        = addNewPair;
-
-  // Screenshot zone
-  wireScreenshotZone();
 
   // Escape key
   document.addEventListener('keydown', handleEscKey);
@@ -393,80 +374,113 @@ async function confirmDeleteSetup(id) {
 }
 
 // =============================================
+//  MODAL DOM MANAGEMENT
+// =============================================
+function ensureModalsInDom() {
+  if (!document.getElementById('st-modal')) {
+    const setupEl = document.createElement('div');
+    setupEl.innerHTML = buildSetupModal();
+    while (setupEl.firstChild) document.body.appendChild(setupEl.firstChild);
+  }
+  if (!document.getElementById('st-pair-modal')) {
+    const pairEl = document.createElement('div');
+    pairEl.innerHTML = buildPairModal();
+    while (pairEl.firstChild) document.body.appendChild(pairEl.firstChild);
+  }
+  wireModalEvents();
+}
+
+function wireModalEvents() {
+  document.getElementById('st-modal-backdrop').onclick  = closeSetupModal;
+  document.getElementById('st-modal-close').onclick     = closeSetupModal;
+  document.getElementById('st-modal-cancel').onclick    = closeSetupModal;
+  document.getElementById('st-modal-save').onclick      = handleSaveSetup;
+
+  document.getElementById('st-pair-modal-backdrop').onclick = closePairModal;
+  document.getElementById('st-pair-modal-close').onclick    = closePairModal;
+  document.getElementById('st-pair-add-btn').onclick        = addNewPair;
+
+  wireScreenshotZone();
+}
+
+// =============================================
 //  SETUP MODAL
 // =============================================
 function buildSetupModal() {
   return `
-    <div id="st-modal-backdrop" class="modal-backdrop hidden" style="position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.6)"></div>
-    <div id="st-modal" class="modal hidden" style="position:fixed;top:5vh;left:50%;transform:translateX(-50%);z-index:1000;width:min(540px,95vw);max-height:90vh;overflow-y:auto">
-      <div class="modal-header">
-        <h3 id="st-modal-title">Add Setup</h3>
-        <button class="modal-close" id="st-modal-close">×</button>
-      </div>
-      <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:16px">
+    <div id="st-modal" class="modal hidden">
+      <div class="modal-backdrop" id="st-modal-backdrop"></div>
+      <div class="modal-dialog" style="width:min(540px,95vw)">
+        <div class="modal-header">
+          <h2 id="st-modal-title">Add Setup</h2>
+          <button class="modal-close" id="st-modal-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
 
-        <input type="hidden" id="st-setup-id">
+          <input type="hidden" id="st-setup-id">
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="form-group">
-            <label class="form-label">Date</label>
-            <input type="date" id="st-date" class="form-input">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="form-group">
+              <label class="form-label">Date</label>
+              <input type="date" id="st-date" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pair</label>
+              <select id="st-pair" class="form-input">
+                <option value="">Select pair</option>
+              </select>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Pair</label>
-            <select id="st-pair" class="form-input">
-              ${getPairs().map(p => `<option value="${p}">${p}</option>`).join('')}
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="form-group">
+              <label class="form-label">Direction</label>
+              <div style="display:flex;gap:8px;margin-top:4px">
+                <button type="button" class="st-dir-btn btn btn-ghost btn-sm" data-dir="long" style="flex:1">▲ Long</button>
+                <button type="button" class="st-dir-btn btn btn-ghost btn-sm" data-dir="short" style="flex:1">▼ Short</button>
+              </div>
+              <input type="hidden" id="st-direction" value="">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Possible R</label>
+              <input type="number" id="st-possible-r" class="form-input" step="0.1" min="0" placeholder="2.5">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">Outcome</label>
+            <select id="st-outcome" class="form-input">
+              <option value="pending">Pending</option>
+              <option value="win">Win</option>
+              <option value="loss">Loss</option>
+              <option value="breakeven">Breakeven</option>
             </select>
           </div>
-        </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">Notes</label>
+            <textarea id="st-notes" class="form-input" rows="3" placeholder="Setup notes, entry criteria, observations..."></textarea>
+          </div>
+
           <div class="form-group">
-            <label class="form-label">Direction</label>
-            <div style="display:flex;gap:8px;margin-top:4px">
-              <button type="button" class="st-dir-btn btn btn-ghost btn-sm" data-dir="long" style="flex:1">▲ Long</button>
-              <button type="button" class="st-dir-btn btn btn-ghost btn-sm" data-dir="short" style="flex:1">▼ Short</button>
+            <label class="form-label">Screenshots</label>
+            <div id="st-screenshot-zone" class="screenshot-zone">
+              <div id="st-upload-prompt" class="upload-prompt">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>Click or drag to add screenshots</span>
+              </div>
+              <div id="st-screenshot-previews" class="screenshot-previews"></div>
             </div>
-            <input type="hidden" id="st-direction" value="">
+            <input type="file" id="st-screenshot-input" accept="image/*" multiple style="display:none">
           </div>
-          <div class="form-group">
-            <label class="form-label">Possible R</label>
-            <input type="number" id="st-possible-r" class="form-input" step="0.1" min="0" placeholder="2.5">
-          </div>
-        </div>
 
-        <div class="form-group">
-          <label class="form-label">Outcome</label>
-          <select id="st-outcome" class="form-input">
-            <option value="pending">Pending</option>
-            <option value="win">Win</option>
-            <option value="loss">Loss</option>
-            <option value="breakeven">Breakeven</option>
-          </select>
         </div>
-
-        <div class="form-group">
-          <label class="form-label">Notes</label>
-          <textarea id="st-notes" class="form-input" rows="3" placeholder="Setup notes, entry criteria, observations..."></textarea>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="st-modal-cancel">Cancel</button>
+          <button class="btn btn-primary" id="st-modal-save">Save Setup</button>
         </div>
-
-        <!-- Screenshots -->
-        <div class="form-group">
-          <label class="form-label">Screenshots</label>
-          <div id="st-screenshot-zone" class="screenshot-zone">
-            <div id="st-upload-prompt" class="upload-prompt">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              <span>Click or drag to add screenshots</span>
-            </div>
-            <div id="st-screenshot-previews" class="screenshot-previews"></div>
-          </div>
-          <input type="file" id="st-screenshot-input" accept="image/*" multiple style="display:none">
-        </div>
-
-      </div>
-      <div class="modal-footer" style="padding:16px 20px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--border)">
-        <button class="btn btn-ghost" id="st-modal-cancel">Cancel</button>
-        <button class="btn btn-primary" id="st-modal-save">Save Setup</button>
       </div>
     </div>
   `;
@@ -489,6 +503,7 @@ function openSetupModal(setup = null) {
   // Reset pair dropdown to current pairs
   const pairSel = document.getElementById('st-pair');
   pairSel.innerHTML = getPairs().map(p => `<option value="${p}">${p}</option>`).join('');
+  pairSel.value = getPairs()[0] || '';
 
   // Reset direction buttons
   document.querySelectorAll('.st-dir-btn').forEach(b => b.classList.remove('active'));
@@ -530,8 +545,7 @@ function openSetupModal(setup = null) {
     document.getElementById('st-modal-title').textContent = 'Add Setup';
   }
 
-  // Show modal + backdrop
-  document.getElementById('st-modal-backdrop').classList.remove('hidden');
+  // Show modal
   document.getElementById('st-modal').classList.remove('hidden');
 
   // Re-wire direction buttons
@@ -545,7 +559,6 @@ function openSetupModal(setup = null) {
 }
 
 function closeSetupModal() {
-  document.getElementById('st-modal-backdrop')?.classList.add('hidden');
   document.getElementById('st-modal')?.classList.add('hidden');
   pendingSetupScreenshots = [];
   editingSetupId = null;
@@ -609,19 +622,23 @@ async function handleSaveSetup() {
 // =============================================
 function buildPairModal() {
   return `
-    <div id="st-pair-modal-backdrop" class="modal-backdrop hidden" style="position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.6)"></div>
-    <div id="st-pair-modal" class="modal hidden" style="position:fixed;top:5vh;left:50%;transform:translateX(-50%);z-index:1000;width:min(400px,95vw);max-height:90vh;overflow-y:auto">
-      <div class="modal-header">
-        <h3>Manage Pairs</h3>
-        <button class="modal-close" id="st-pair-modal-close">×</button>
-      </div>
-      <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:12px">
-        <div id="st-pair-list" style="display:flex;flex-direction:column;gap:8px"></div>
-        <div style="display:flex;gap:8px;margin-top:4px">
-          <input type="text" id="st-new-pair-input" class="form-input" placeholder="e.g. USDJPY" style="text-transform:uppercase;flex:1">
-          <button class="btn btn-primary btn-sm" id="st-pair-add-btn">Add</button>
+    <div id="st-pair-modal" class="modal hidden">
+      <div class="modal-backdrop" id="st-pair-modal-backdrop"></div>
+      <div class="modal-dialog" style="width:min(400px,95vw)">
+        <div class="modal-header">
+          <h2>Manage Pairs</h2>
+          <button class="modal-close" id="st-pair-modal-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
-        <p class="text-xs text-muted">Pairs are stored locally in your browser.</p>
+        <div class="modal-body">
+          <div id="st-pair-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="st-new-pair-input" class="form-input" placeholder="e.g. USDJPY" style="text-transform:uppercase;flex:1">
+            <button class="btn btn-primary btn-sm" id="st-pair-add-btn">Add</button>
+          </div>
+          <p class="text-xs text-muted" style="margin-top:12px">Pairs are stored locally in your browser.</p>
+        </div>
       </div>
     </div>
   `;
@@ -629,13 +646,11 @@ function buildPairModal() {
 
 function openPairModal() {
   renderPairList();
-  document.getElementById('st-pair-modal-backdrop').classList.remove('hidden');
   document.getElementById('st-pair-modal').classList.remove('hidden');
   document.getElementById('st-new-pair-input').value = '';
 }
 
 function closePairModal() {
-  document.getElementById('st-pair-modal-backdrop').classList.add('hidden');
   document.getElementById('st-pair-modal').classList.add('hidden');
 }
 
