@@ -7,9 +7,8 @@ import { todayString, getWeekRange, addDays, formatDate, formatDateShort,
 import { showToast } from '../app.js';
 
 // ---- Module state ----
-let currentWeekStart    = null;
+let currentWeekStart        = null;
 let pendingSetupScreenshots = [];  // { file, localUrl, uploaded, url? }
-let editingSetupId      = null;
 
 const DEFAULT_PAIRS = ['EURUSD', 'GBPUSD'];
 
@@ -65,6 +64,11 @@ function buildShell() {
       <div class="loading-screen" style="padding:20px"><div class="loading-spinner"></div></div>
     </div>
 
+    <!-- Weekly R chart -->
+    <div id="st-chart-section" class="card" style="margin-bottom:20px;padding:20px">
+      <div class="loading-screen" style="padding:20px"><div class="loading-spinner"></div></div>
+    </div>
+
     <!-- Week nav -->
     <div class="week-nav" style="margin-bottom:16px">
       <button class="btn btn-ghost btn-sm" id="st-week-prev">‹ Prev Week</button>
@@ -109,24 +113,26 @@ function handleEscKey(e) {
 }
 
 async function loadAll() {
-  await Promise.all([loadAllTimeStats(), loadWeek()]);
+  await Promise.all([loadAllTimeAndChart(), loadWeek()]);
 }
 
-// =============================================
-//  ALL-TIME STATS
-// =============================================
-async function loadAllTimeStats() {
-  const el = document.getElementById('st-alltime-stats');
-  if (!el) return;
-
+async function loadAllTimeAndChart() {
+  const statsEl = document.getElementById('st-alltime-stats');
+  const chartEl = document.getElementById('st-chart-section');
   try {
-    const setups = await getStrategySetups();
-    const stats  = calcSetupStats(setups);
-    el.innerHTML = buildAllTimeStats(stats, setups);
+    const allSetups = await getStrategySetups();
+    const stats = calcSetupStats(allSetups);
+    if (statsEl) statsEl.innerHTML = buildAllTimeStats(stats);
+    renderChartSection(allSetups);
   } catch (err) {
-    el.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
+    if (statsEl) statsEl.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
+    if (chartEl) chartEl.innerHTML = `<p class="text-loss text-sm" style="padding:20px">${err.message}</p>`;
   }
 }
+
+// =============================================
+//  ALL-TIME STATS + CHART
+// =============================================
 
 function calcSetupStats(setups) {
   const closed  = setups.filter(s => s.outcome && s.outcome !== 'pending');
@@ -136,7 +142,6 @@ function calcSetupStats(setups) {
   const pending = setups.filter(s => !s.outcome || s.outcome === 'pending');
 
   const winRate  = closed.length ? (wins.length / closed.length * 100) : 0;
-  const lossRate = closed.length ? (losses.length / closed.length * 100) : 0;
 
   const avgWinR  = wins.length
     ? wins.reduce((s, x) => s + (parseFloat(x.possible_r) || 0), 0) / wins.length
@@ -145,13 +150,10 @@ function calcSetupStats(setups) {
     ? losses.reduce((s, x) => s + (parseFloat(x.possible_r) || 0), 0) / losses.length
     : 0;
 
-  // R Expectancy = (winRate * avgWinR) - (lossRate * 1.0)
-  // Using 1.0 as the risk per trade (1R loss)
-  const rExpectancy = closed.length
-    ? ((wins.length / closed.length) * avgWinR) - ((losses.length / closed.length) * 1.0)
-    : 0;
+  // Total R: sum wins' possible_r, deduct 1R per loss
+  const totalR = wins.reduce((s, x) => s + (parseFloat(x.possible_r) || 0), 0) - losses.length;
 
-  // Current streak
+  // Current streak (most recent first — setups ordered desc by date)
   let streak = 0;
   let streakType = '';
   for (const s of setups) {
@@ -170,18 +172,17 @@ function calcSetupStats(setups) {
     bes: bes.length,
     pending: pending.length,
     winRate,
-    lossRate,
     avgWinR,
     avgLossR,
-    rExpectancy,
+    totalR,
     streak,
     streakType,
   };
 }
 
-function buildAllTimeStats(stats, setups) {
-  const rExpColor = stats.rExpectancy >= 0 ? 'text-profit' : 'text-loss';
-  const rExpSign  = stats.rExpectancy >= 0 ? '+' : '';
+function buildAllTimeStats(stats) {
+  const rColor = stats.totalR >= 0 ? 'text-profit' : 'text-loss';
+  const rSign  = stats.totalR >= 0 ? '+' : '';
 
   let streakLabel = '—';
   if (stats.streak > 0) {
@@ -194,20 +195,15 @@ function buildAllTimeStats(stats, setups) {
       <div class="stat-value neutral">${stats.total}</div>
       <div class="stat-sub">${stats.closed} closed · ${stats.pending} pending</div>
     </div>
-    <div class="stat-card ${stats.winRate >= 50 ? 'profit' : ''}">
+    <div class="stat-card ${stats.winRate >= 50 && stats.closed ? 'profit' : ''}">
       <div class="stat-label">Win Rate</div>
       <div class="stat-value neutral">${stats.closed ? stats.winRate.toFixed(1) + '%' : '—'}</div>
       <div class="stat-sub">${stats.wins}W / ${stats.losses}L / ${stats.bes}BE</div>
     </div>
     <div class="stat-card secondary">
-      <div class="stat-label">R Expectancy</div>
-      <div class="stat-value ${rExpColor}">${stats.closed ? rExpSign + stats.rExpectancy.toFixed(2) + 'R' : '—'}</div>
-      <div class="stat-sub">Per trade expected return</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Avg Win R</div>
-      <div class="stat-value text-profit">${stats.wins ? stats.avgWinR.toFixed(2) + 'R' : '—'}</div>
-      <div class="stat-sub">Avg Loss R: ${stats.losses ? stats.avgLossR.toFixed(2) + 'R' : '—'}</div>
+      <div class="stat-label">Total R</div>
+      <div class="stat-value ${rColor}">${stats.closed ? rSign + stats.totalR.toFixed(2) + 'R' : '—'}</div>
+      <div class="stat-sub">Wins: +${stats.avgWinR.toFixed(2)}R avg · Loss: −1R each</div>
     </div>
     <div class="stat-card warning">
       <div class="stat-label">Current Streak</div>
@@ -215,6 +211,124 @@ function buildAllTimeStats(stats, setups) {
       <div class="stat-sub">Most recent run</div>
     </div>
   `;
+}
+
+// =============================================
+//  WEEKLY R CHART
+// =============================================
+function renderChartSection(allSetups) {
+  const el = document.getElementById('st-chart-section');
+  if (!el) return;
+
+  // Build weekly buckets from all setups
+  const weekMap = {};
+  for (const s of allSetups) {
+    if (!s.date) continue;
+    const ws = getWeekRange(s.date).start;
+    if (!weekMap[ws]) weekMap[ws] = [];
+    weekMap[ws].push(s);
+  }
+
+  const weeks = Object.keys(weekMap).sort();
+  if (!weeks.length) {
+    el.innerHTML = `<p class="text-sm text-muted" style="text-align:center;padding:20px">No data yet for chart</p>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="card-title" style="font-size:14px">Weekly R Performance</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-xs st-chart-filter ${weeks.length <= 4 ? 'active' : ''}" data-weeks="4">4W</button>
+        <button class="btn btn-ghost btn-xs st-chart-filter ${weeks.length > 4 && weeks.length <= 8 ? 'active' : ''}" data-weeks="8">8W</button>
+        <button class="btn btn-ghost btn-xs st-chart-filter ${weeks.length > 8 && weeks.length <= 12 ? 'active' : ''}" data-weeks="12">12W</button>
+        <button class="btn btn-ghost btn-xs st-chart-filter ${weeks.length > 12 ? 'active' : ''}" data-weeks="all">All</button>
+      </div>
+    </div>
+    <div style="position:relative;height:180px">
+      <canvas id="st-weekly-chart"></canvas>
+    </div>
+  `;
+
+  // Default filter: show enough to cover actual data, cap at 12 unless more
+  const defaultFilter = weeks.length <= 4 ? 4 : weeks.length <= 8 ? 8 : weeks.length <= 12 ? 12 : 'all';
+  drawWeeklyChart(weeks, weekMap, defaultFilter);
+
+  // Mark correct button active
+  document.querySelectorAll('.st-chart-filter').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.weeks === String(defaultFilter));
+    btn.onclick = () => {
+      document.querySelectorAll('.st-chart-filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      drawWeeklyChart(weeks, weekMap, btn.dataset.weeks === 'all' ? 'all' : parseInt(btn.dataset.weeks));
+    };
+  });
+}
+
+function drawWeeklyChart(allWeeks, weekMap, filter) {
+  const weeks = filter === 'all' ? allWeeks : allWeeks.slice(-filter);
+
+  const labels = weeks.map(ws => {
+    const d = new Date(ws + 'T00:00:00');
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  });
+
+  const data = weeks.map(ws => {
+    const setups = weekMap[ws];
+    const wins   = setups.filter(s => s.outcome === 'win');
+    const losses = setups.filter(s => s.outcome === 'loss');
+    const r = wins.reduce((s, x) => s + (parseFloat(x.possible_r) || 0), 0) - losses.length;
+    return parseFloat(r.toFixed(2));
+  });
+
+  const colors = data.map(v => v >= 0 ? 'rgba(0,217,126,0.8)' : 'rgba(255,71,87,0.8)');
+  const borderColors = data.map(v => v >= 0 ? '#00d97e' : '#ff4757');
+
+  const canvas = document.getElementById('st-weekly-chart');
+  if (!canvas) return;
+
+  if (canvas._chart) { canvas._chart.destroy(); }
+
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Weekly R',
+        data,
+        backgroundColor: colors,
+        borderColor: borderColors,
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}R`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#8892a4', font: { size: 11 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: {
+            color: '#8892a4',
+            font: { size: 11 },
+            callback: v => `${v}R`
+          }
+        }
+      }
+    }
+  });
 }
 
 // =============================================
@@ -246,9 +360,8 @@ async function loadWeek() {
 
 function buildWeekContent(setups) {
   const stats = calcSetupStats(setups);
-
-  const rExpColor = stats.rExpectancy >= 0 ? 'text-profit' : 'text-loss';
-  const rExpSign  = stats.rExpectancy >= 0 ? '+' : '';
+  const rColor = stats.totalR >= 0 ? 'text-profit' : 'text-loss';
+  const rSign  = stats.totalR >= 0 ? '+' : '';
 
   return `
     <!-- Week stats -->
@@ -264,9 +377,9 @@ function buildWeekContent(setups) {
         <div class="stat-sub">${stats.wins}W / ${stats.losses}L</div>
       </div>
       <div class="stat-card secondary">
-        <div class="stat-label">R Expectancy</div>
-        <div class="stat-value ${rExpColor}">${stats.closed ? rExpSign + stats.rExpectancy.toFixed(2) + 'R' : '—'}</div>
-        <div class="stat-sub">Avg Win R: ${stats.wins ? stats.avgWinR.toFixed(2) + 'R' : '—'}</div>
+        <div class="stat-label">Total R</div>
+        <div class="stat-value ${rColor}">${stats.closed ? rSign + stats.totalR.toFixed(2) + 'R' : '—'}</div>
+        <div class="stat-sub">Avg Win: ${stats.wins ? stats.avgWinR.toFixed(2) + 'R' : '—'}</div>
       </div>
     </div>
 
@@ -374,23 +487,9 @@ async function confirmDeleteSetup(id) {
 }
 
 // =============================================
-//  MODAL DOM MANAGEMENT
+//  MODAL WIRING (modals live in index.html)
 // =============================================
 function ensureModalsInDom() {
-  if (!document.getElementById('st-modal')) {
-    const setupEl = document.createElement('div');
-    setupEl.innerHTML = buildSetupModal();
-    while (setupEl.firstChild) document.body.appendChild(setupEl.firstChild);
-  }
-  if (!document.getElementById('st-pair-modal')) {
-    const pairEl = document.createElement('div');
-    pairEl.innerHTML = buildPairModal();
-    while (pairEl.firstChild) document.body.appendChild(pairEl.firstChild);
-  }
-  wireModalEvents();
-}
-
-function wireModalEvents() {
   document.getElementById('st-modal-backdrop').onclick  = closeSetupModal;
   document.getElementById('st-modal-close').onclick     = closeSetupModal;
   document.getElementById('st-modal-cancel').onclick    = closeSetupModal;
@@ -400,94 +499,18 @@ function wireModalEvents() {
   document.getElementById('st-pair-modal-close').onclick    = closePairModal;
   document.getElementById('st-pair-add-btn').onclick        = addNewPair;
 
+  // Allow Enter key to add pair
+  document.getElementById('st-new-pair-input')?.addEventListener('keypress', e => {
+    if (e.key === 'Enter') addNewPair();
+  });
+
   wireScreenshotZone();
 }
 
 // =============================================
 //  SETUP MODAL
 // =============================================
-function buildSetupModal() {
-  return `
-    <div id="st-modal" class="modal hidden">
-      <div class="modal-backdrop" id="st-modal-backdrop"></div>
-      <div class="modal-dialog" style="width:min(540px,95vw)">
-        <div class="modal-header">
-          <h2 id="st-modal-title">Add Setup</h2>
-          <button class="modal-close" id="st-modal-close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-        <div class="modal-body">
-
-          <input type="hidden" id="st-setup-id">
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-            <div class="form-group">
-              <label class="form-label">Date</label>
-              <input type="date" id="st-date" class="form-input">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Pair</label>
-              <select id="st-pair" class="form-input">
-                <option value="">Select pair</option>
-              </select>
-            </div>
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-            <div class="form-group">
-              <label class="form-label">Direction</label>
-              <div style="display:flex;gap:8px;margin-top:4px">
-                <button type="button" class="st-dir-btn btn btn-ghost btn-sm" data-dir="long" style="flex:1">▲ Long</button>
-                <button type="button" class="st-dir-btn btn btn-ghost btn-sm" data-dir="short" style="flex:1">▼ Short</button>
-              </div>
-              <input type="hidden" id="st-direction" value="">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Possible R</label>
-              <input type="number" id="st-possible-r" class="form-input" step="0.1" min="0" placeholder="2.5">
-            </div>
-          </div>
-
-          <div class="form-group" style="margin-bottom:16px">
-            <label class="form-label">Outcome</label>
-            <select id="st-outcome" class="form-input">
-              <option value="pending">Pending</option>
-              <option value="win">Win</option>
-              <option value="loss">Loss</option>
-              <option value="breakeven">Breakeven</option>
-            </select>
-          </div>
-
-          <div class="form-group" style="margin-bottom:16px">
-            <label class="form-label">Notes</label>
-            <textarea id="st-notes" class="form-input" rows="3" placeholder="Setup notes, entry criteria, observations..."></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Screenshots</label>
-            <div id="st-screenshot-zone" class="screenshot-zone">
-              <div id="st-upload-prompt" class="upload-prompt">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <span>Click or drag to add screenshots</span>
-              </div>
-              <div id="st-screenshot-previews" class="screenshot-previews"></div>
-            </div>
-            <input type="file" id="st-screenshot-input" accept="image/*" multiple style="display:none">
-          </div>
-
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-ghost" id="st-modal-cancel">Cancel</button>
-          <button class="btn btn-primary" id="st-modal-save">Save Setup</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function openSetupModal(setup = null) {
-  editingSetupId = null;
   pendingSetupScreenshots = [];
 
   // Reset form
@@ -495,7 +518,7 @@ function openSetupModal(setup = null) {
   document.getElementById('st-date').value        = todayString();
   document.getElementById('st-direction').value   = '';
   document.getElementById('st-possible-r').value  = '';
-  document.getElementById('st-outcome').value     = 'pending';
+  document.getElementById('st-outcome').value     = 'win';
   document.getElementById('st-notes').value       = '';
   document.getElementById('st-screenshot-previews').innerHTML = '';
   document.getElementById('st-upload-prompt').style.display = '';
@@ -561,7 +584,6 @@ function openSetupModal(setup = null) {
 function closeSetupModal() {
   document.getElementById('st-modal')?.classList.add('hidden');
   pendingSetupScreenshots = [];
-  editingSetupId = null;
 }
 
 async function handleSaveSetup() {
@@ -598,7 +620,7 @@ async function handleSaveSetup() {
       pair,
       direction:   document.getElementById('st-direction').value || null,
       possible_r:  parseFloat(document.getElementById('st-possible-r').value) || null,
-      outcome:     document.getElementById('st-outcome').value || 'pending',
+      outcome:     document.getElementById('st-outcome').value || 'win',
       notes:       document.getElementById('st-notes').value.trim() || null,
       screenshots: screenshotUrls,
     };
@@ -620,30 +642,6 @@ async function handleSaveSetup() {
 // =============================================
 //  PAIR MANAGEMENT MODAL
 // =============================================
-function buildPairModal() {
-  return `
-    <div id="st-pair-modal" class="modal hidden">
-      <div class="modal-backdrop" id="st-pair-modal-backdrop"></div>
-      <div class="modal-dialog" style="width:min(400px,95vw)">
-        <div class="modal-header">
-          <h2>Manage Pairs</h2>
-          <button class="modal-close" id="st-pair-modal-close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-        <div class="modal-body">
-          <div id="st-pair-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
-          <div style="display:flex;gap:8px">
-            <input type="text" id="st-new-pair-input" class="form-input" placeholder="e.g. USDJPY" style="text-transform:uppercase;flex:1">
-            <button class="btn btn-primary btn-sm" id="st-pair-add-btn">Add</button>
-          </div>
-          <p class="text-xs text-muted" style="margin-top:12px">Pairs are stored locally in your browser.</p>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function openPairModal() {
   renderPairList();
   document.getElementById('st-pair-modal').classList.remove('hidden');
