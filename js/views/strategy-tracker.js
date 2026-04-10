@@ -532,7 +532,6 @@ function openSetupModal(setup = null) {
   document.querySelectorAll('.st-dir-btn').forEach(b => b.classList.remove('active'));
 
   if (setup) {
-    editingSetupId = setup.id;
     document.getElementById('st-modal-title').textContent = 'Edit Setup';
     document.getElementById('st-setup-id').value  = setup.id;
     document.getElementById('st-date').value       = setup.date || todayString();
