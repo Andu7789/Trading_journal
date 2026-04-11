@@ -6,6 +6,7 @@ import { todayString, formatDate, addDays, calcStats, formatCurrency,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          tiltLabel, tiltClass, nl2br, debounce } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
+import { getNewsForDate } from '../news.js';
 
 let currentDate = todayString();
 let saveTimer = null;
@@ -62,12 +63,13 @@ async function loadJournalDay(date) {
 
   try {
     const yesterday = addDays(date, -1);
-    const [entry, trades, prevEntry] = await Promise.all([
+    const [entry, trades, prevEntry, news] = await Promise.all([
       getJournalEntry(date),
       getTrades({ date }),
-      getJournalEntry(yesterday)
+      getJournalEntry(yesterday),
+      getNewsForDate(date),
     ]);
-    body.innerHTML = buildJournalBody(date, entry || {}, trades, prevEntry);
+    body.innerHTML = buildJournalBody(date, entry || {}, trades, prevEntry, news);
     initJournalInteractions(date, entry || {});
   } catch (err) {
     console.error('Journal load error:', err);
@@ -75,7 +77,7 @@ async function loadJournalDay(date) {
   }
 }
 
-function buildJournalBody(date, entry, trades, prevEntry) {
+function buildJournalBody(date, entry, trades, prevEntry, news = []) {
   const stats = calcStats(trades);
   const isToday = date === todayString();
   const dayLabel = formatDateLong(date);
@@ -93,6 +95,8 @@ function buildJournalBody(date, entry, trades, prevEntry) {
         </div>
       ` : ''}
     </div>
+
+    ${buildNewsStrip(news)}
 
     <div class="journal-sections" id="journal-sections">
 
@@ -241,6 +245,51 @@ function buildJournalBody(date, entry, trades, prevEntry) {
     <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:24px">
       <span id="autosave-msg" class="autosave-indicator"></span>
       <button class="btn btn-primary btn-lg" id="save-journal-btn">Save Journal Entry</button>
+    </div>
+  `;
+}
+
+function buildNewsStrip(news) {
+  if (!news.length) return '';
+
+  const impactColor = { High: '#ff4757', Medium: '#ffa502' };
+  const impactBg    = { High: 'rgba(255,71,87,0.1)', Medium: 'rgba(255,165,2,0.1)' };
+
+  const high   = news.filter(e => e.impact === 'High');
+  const medium = news.filter(e => e.impact === 'Medium');
+
+  return `
+    <div style="
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid #ff4757;
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      margin-bottom: 20px;
+    ">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:16px">📅</span>
+        <span style="font-size:13px;font-weight:700;color:var(--text-primary)">Economic Events Today</span>
+        ${high.length ? `<span style="font-size:11px;background:rgba(255,71,87,0.15);color:#ff4757;padding:2px 8px;border-radius:20px;font-weight:600">${high.length} HIGH IMPACT</span>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${news.map(e => {
+          const time = e.time ? e.time.slice(0,5) : '—';
+          const col  = impactColor[e.impact] || 'var(--text-muted)';
+          const bg   = impactBg[e.impact]    || 'transparent';
+          const forecast = e.forecast ? `<span class="text-xs text-muted" style="margin-left:8px">F: ${e.forecast}</span>` : '';
+          const previous = e.previous ? `<span class="text-xs text-muted">P: ${e.previous}</span>` : '';
+          return `
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:${bg};border-radius:var(--radius);border:1px solid ${col}22">
+              <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);min-width:38px">${time}</span>
+              <span style="font-size:11px;font-weight:700;color:${col};min-width:32px">${e.country}</span>
+              <span style="font-size:13px;color:var(--text-primary);flex:1">${e.title}</span>
+              ${forecast}${previous}
+              <span style="font-size:10px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:0.5px">${e.impact}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
     </div>
   `;
 }
