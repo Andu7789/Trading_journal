@@ -112,12 +112,27 @@ CREATE TABLE IF NOT EXISTS public.playbook (
 );
 
 -- =============================================
+--  NOTES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS public.notes (
+  id         UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  date       DATE NOT NULL,
+  content    TEXT NOT NULL DEFAULT '',
+  tags       TEXT[] DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS notes_date_idx ON public.notes (date DESC);
+
+-- =============================================
 --  ROW LEVEL SECURITY
 --  (Personal app — allow all operations)
 -- =============================================
 ALTER TABLE public.trades         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.playbook        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notes           ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations for anon key (personal use)
 CREATE POLICY "Allow all for anon" ON public.trades
@@ -127,6 +142,9 @@ CREATE POLICY "Allow all for anon" ON public.journal_entries
   FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Allow all for anon" ON public.playbook
+  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all for anon" ON public.notes
   FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================

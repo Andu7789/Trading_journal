@@ -246,6 +246,64 @@ export async function deleteStrategySetup(id) {
 }
 
 // =============================================
+//  NOTES
+// =============================================
+
+export async function getNotes(filters = {}) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  let query = _client
+    .from('notes')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (filters.startDate) query = query.gte('date', filters.startDate);
+  if (filters.endDate)   query = query.lte('date', filters.endDate);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveNote(noteData) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  const { id, ...data } = noteData;
+  data.updated_at = new Date().toISOString();
+
+  // Parse tags to array
+  if (typeof data.tags === 'string') {
+    data.tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
+  }
+
+  if (id) {
+    const { data: result, error } = await _client
+      .from('notes')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
+  } else {
+    const { data: result, error } = await _client
+      .from('notes')
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
+  }
+}
+
+export async function deleteNote(id) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { error } = await _client.from('notes').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// =============================================
 //  PLAYBOOK
 // =============================================
 
