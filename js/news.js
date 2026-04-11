@@ -2,15 +2,15 @@
 //  NEWS CALENDAR — ForexFactory feed
 // =============================================
 
-const CACHE_KEY     = 'tj_news_cache_v5';
+const CACHE_KEY     = 'tj_news_cache_v6';
 const CACHE_TTL_MS  = 60 * 60 * 1000; // 1 hour
 
 const FF_BASE  = 'https://nfs.faireconomy.media';
 // corsproxy.io is more reliable than allorigins for this feed
 const PROXY    = 'https://corsproxy.io/?';
 const FEEDS = [
-  `${PROXY}${FF_BASE}/ff_calendar_thisweek.json`,
-  `${PROXY}${FF_BASE}/ff_calendar_nextweek.json`,
+  `${PROXY}${encodeURIComponent(FF_BASE + '/ff_calendar_thisweek.json')}`,
+  `${PROXY}${encodeURIComponent(FF_BASE + '/ff_calendar_nextweek.json')}`,
 ];
 
 // Currencies we care about (matches user's pairs + USD as driver)
