@@ -2,11 +2,12 @@
 //  NEWS CALENDAR — ForexFactory feed
 // =============================================
 
-const CACHE_KEY     = 'tj_news_cache_v3';
+const CACHE_KEY     = 'tj_news_cache_v4';
 const CACHE_TTL_MS  = 60 * 60 * 1000; // 1 hour
 
 const FF_BASE  = 'https://nfs.faireconomy.media';
-const PROXY    = 'https://api.allorigins.win/raw?url=';
+// corsproxy.io is more reliable than allorigins for this feed
+const PROXY    = 'https://corsproxy.io/?';
 const FEEDS = [
   `${PROXY}${encodeURIComponent(FF_BASE + '/ff_calendar_thisweek.json')}`,
   `${PROXY}${encodeURIComponent(FF_BASE + '/ff_calendar_nextweek.json')}`,
@@ -76,14 +77,25 @@ async function fetchAll() {
   // Fetch both weeks in parallel
   try {
     const results = await Promise.allSettled(
-      FEEDS.map(url => fetch(url).then(r => r.ok ? r.json() : []))
+      FEEDS.map(url =>
+        fetch(url).then(async r => {
+          const text = await r.text();
+          try {
+            const parsed = JSON.parse(text);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            console.warn('[News] Non-JSON response from proxy:', text.slice(0, 200));
+            return [];
+          }
+        })
+      )
     );
 
     const data = results
       .filter(r => r.status === 'fulfilled')
       .flatMap(r => Array.isArray(r.value) ? r.value : []);
 
-    console.log('[News] Fetched', data.length, 'events from ForexFactory');
+    console.log('[News] Fetched', data.length, 'events. Sample:', data[0]);
 
     // Cache it
     try {
