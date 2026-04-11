@@ -2,12 +2,14 @@
 //  NEWS CALENDAR — ForexFactory feed
 // =============================================
 
-const CACHE_KEY     = 'tj_news_cache_v2';
+const CACHE_KEY     = 'tj_news_cache_v3';
 const CACHE_TTL_MS  = 60 * 60 * 1000; // 1 hour
 
+const FF_BASE  = 'https://nfs.faireconomy.media';
+const PROXY    = 'https://api.allorigins.win/raw?url=';
 const FEEDS = [
-  'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
-  'https://nfs.faireconomy.media/ff_calendar_nextweek.json',
+  `${PROXY}${encodeURIComponent(FF_BASE + '/ff_calendar_thisweek.json')}`,
+  `${PROXY}${encodeURIComponent(FF_BASE + '/ff_calendar_nextweek.json')}`,
 ];
 
 // Currencies we care about (matches user's pairs + USD as driver)
