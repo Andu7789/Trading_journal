@@ -82,6 +82,16 @@ function buildJournalBody(date, entry, trades, prevEntry, news = []) {
   const isToday = date === todayString();
   const dayLabel = formatDateLong(date);
 
+  // Auto-fill Economic Events textarea when entry has no saved value
+  const autoEconomicEvents = !entry.economic_events && news.length
+    ? news.map(e => {
+        const t = eventTime(e);
+        const extras = [e.forecast && `F: ${e.forecast}`, e.previous && `P: ${e.previous}`]
+          .filter(Boolean).join(', ');
+        return `${t} ${e.country} ${e.title}${extras ? ` (${extras})` : ''}`;
+      }).join('\n')
+    : '';
+
   return `
     <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">
       <div>
@@ -141,7 +151,7 @@ function buildJournalBody(date, entry, trades, prevEntry, news = []) {
           </div>
           <div class="form-group">
             <label class="form-label">Economic Events Today</label>
-            <textarea id="j-economic" class="form-textarea" rows="2" placeholder="CPI, FOMC, NFP, earnings, interest rate decisions...">${entry.economic_events || ''}</textarea>
+            <textarea id="j-economic" class="form-textarea" rows="2" placeholder="CPI, FOMC, NFP, earnings, interest rate decisions...">${entry.economic_events || autoEconomicEvents}</textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Daily Goals &amp; Trading Plan</label>

@@ -25,11 +25,11 @@ const WATCHED = ['GBP', 'EUR', 'USD'];
  */
 export async function getNewsForDate(date) {
   const all = await fetchAll();
-  const filtered = all.filter(e => {
-    const eDate = eventDate(e);
-    return eDate === date && WATCHED.includes(e.country) &&
-           ['High', 'Medium'].includes(e.impact);
-  }).sort((a, b) => eventDate(a).localeCompare(eventDate(b)));
+  const onDay = all.filter(e => eventDate(e) === date);
+  console.log(`[News] ${date}: ${onDay.length} total events on day, countries: ${[...new Set(onDay.map(e=>e.country))].join(',')}, impacts: ${[...new Set(onDay.map(e=>e.impact))].join(',')}`);
+  const filtered = onDay.filter(e =>
+    WATCHED.includes(e.country) && ['High', 'Medium'].includes(e.impact)
+  ).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   return filtered;
 }
 
