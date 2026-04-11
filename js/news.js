@@ -2,7 +2,7 @@
 //  NEWS CALENDAR — ForexFactory feed
 // =============================================
 
-const CACHE_KEY     = 'tj_news_cache';
+const CACHE_KEY     = 'tj_news_cache_v2';
 const CACHE_TTL_MS  = 60 * 60 * 1000; // 1 hour
 
 const FEEDS = [
@@ -22,11 +22,29 @@ const WATCHED = ['GBP', 'EUR', 'USD'];
  */
 export async function getNewsForDate(date) {
   const all = await fetchAll();
-  return all.filter(e => {
-    const eDate = (e.date || '').slice(0, 10);
+  const filtered = all.filter(e => {
+    const eDate = eventDate(e);
     return eDate === date && WATCHED.includes(e.country) &&
            ['High', 'Medium'].includes(e.impact);
-  }).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  }).sort((a, b) => eventDate(a).localeCompare(eventDate(b)));
+  return filtered;
+}
+
+/** Extract local YYYY-MM-DD from an event (date field is ISO with offset) */
+function eventDate(e) {
+  // e.date looks like "2026-04-14T08:30:00-04:00" — just slice first 10 chars
+  return (e.date || '').slice(0, 10);
+}
+
+/** Extract HH:MM time string from event date, converted to UK local time */
+function eventTime(e) {
+  if (!e.date) return '—';
+  try {
+    const d = new Date(e.date);
+    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+  } catch {
+    return (e.date || '').slice(11, 16);
+  }
 }
 
 /**
@@ -63,13 +81,19 @@ async function fetchAll() {
       .filter(r => r.status === 'fulfilled')
       .flatMap(r => Array.isArray(r.value) ? r.value : []);
 
+    console.log('[News] Fetched', data.length, 'events from ForexFactory');
+
     // Cache it
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
     } catch {}
 
     return data;
-  } catch {
+  } catch (err) {
+    console.warn('[News] Feed fetch failed:', err.message);
     return [];
   }
 }
+
+// Export helpers for use in buildNewsStrip
+export { eventTime };

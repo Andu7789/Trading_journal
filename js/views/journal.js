@@ -6,7 +6,7 @@ import { todayString, formatDate, addDays, calcStats, formatCurrency,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          tiltLabel, tiltClass, nl2br, debounce } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
-import { getNewsForDate } from '../news.js';
+import { getNewsForDate, eventTime } from '../news.js';
 
 let currentDate = todayString();
 let saveTimer = null;
@@ -274,7 +274,7 @@ function buildNewsStrip(news) {
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
         ${news.map(e => {
-          const time = e.time ? e.time.slice(0,5) : '—';
+          const time = eventTime(e);
           const col  = impactColor[e.impact] || 'var(--text-muted)';
           const bg   = impactBg[e.impact]    || 'transparent';
           const forecast = e.forecast ? `<span class="text-xs text-muted" style="margin-left:8px">F: ${e.forecast}</span>` : '';
