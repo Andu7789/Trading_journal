@@ -151,7 +151,7 @@ function buildJournalBody(date, entry, trades, prevEntry, news = []) {
           </div>
           <div class="form-group">
             <label class="form-label">Economic Events Today</label>
-            <textarea id="j-economic" class="form-textarea" rows="2" placeholder="CPI, FOMC, NFP, earnings, interest rate decisions...">${entry.economic_events || autoEconomicEvents}</textarea>
+            <textarea id="j-economic" class="form-textarea" rows="2" style="resize:none;overflow:hidden" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" placeholder="CPI, FOMC, NFP, earnings, interest rate decisions...">${entry.economic_events || autoEconomicEvents}</textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Daily Goals &amp; Trading Plan</label>
@@ -359,8 +359,15 @@ function buildScreenshots(trades) {
   `;
 }
 
-function initJournalInteractions(date, entry) {
+function initJournalInteractions(date) {
   window._openTradeModal = (id, d) => openTradeModal(id, d || date);
+
+  // Auto-size the economic events textarea to its content on load
+  const econTA = document.getElementById('j-economic');
+  if (econTA && econTA.value) {
+    econTA.style.height = 'auto';
+    econTA.style.height = econTA.scrollHeight + 'px';
+  }
 
   window._toggleSection = (name) => {
     const sec = document.getElementById(`section-${name}`);
