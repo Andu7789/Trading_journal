@@ -4,7 +4,7 @@
 import { getTrades, deleteTrade, getClient } from '../db.js';
 import { calcStats, formatCurrency, formatDate, pnlClass, pnlSign,
          getOutcomeBadge, getDirectionBadge, getEmotionChip,
-         todayString, nl2br } from '../utils.js';
+         todayString, getWeekRange, addDays, nl2br } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
 
 let currentFilters = {};
@@ -26,6 +26,12 @@ export async function renderTrades(container) {
 
     <!-- Filters -->
     <div class="card" style="margin-bottom:16px;padding:16px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn btn-ghost btn-sm" onclick="window._quickFilter('this-week')">This Week</button>
+        <button class="btn btn-ghost btn-sm" onclick="window._quickFilter('last-week')">Last Week</button>
+        <button class="btn btn-ghost btn-sm" onclick="window._quickFilter('this-month')">This Month</button>
+        <button class="btn btn-ghost btn-sm" onclick="window._quickFilter('last-month')">Last Month</button>
+      </div>
       <div class="filters-bar" id="filters-bar">
         <div class="filter-group">
           <label class="filter-label">From</label>
@@ -80,6 +86,33 @@ export async function renderTrades(container) {
   `;
 
   window._openTradeModalTrades = () => openTradeModal(null, null, refreshTrades);
+
+  window._quickFilter = (period) => {
+    const today = todayString();
+    const thisWeek = getWeekRange(today);
+    let start, end;
+    if (period === 'this-week') {
+      start = thisWeek.start; end = thisWeek.end;
+    } else if (period === 'last-week') {
+      const lastMon = addDays(thisWeek.start, -7);
+      const lastWeek = getWeekRange(lastMon);
+      start = lastWeek.start; end = lastWeek.end;
+    } else if (period === 'this-month') {
+      const d = new Date(today + 'T00:00:00');
+      start = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+      end = today;
+    } else if (period === 'last-month') {
+      const d = new Date(today + 'T00:00:00');
+      const lastMonth = d.getMonth() === 0 ? 12 : d.getMonth();
+      const year = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+      const lastDay = new Date(year, lastMonth, 0).getDate();
+      start = `${year}-${String(lastMonth).padStart(2,'0')}-01`;
+      end   = `${year}-${String(lastMonth).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+    }
+    document.getElementById('filter-start').value = start;
+    document.getElementById('filter-end').value   = end;
+    applyFilters();
+  };
 
   document.getElementById('apply-filters-btn').onclick = applyFilters;
   document.getElementById('clear-filters-btn').onclick = clearFilters;

@@ -451,8 +451,6 @@ async function loadTradeIntoModal(id) {
     // Screenshots
     if (trade.screenshots?.length) {
       const previews = document.getElementById('screenshot-previews');
-      const prompt   = document.getElementById('upload-prompt');
-      if (prompt) prompt.style.display = 'none';
       trade.screenshots.forEach(url => {
         pendingScreenshots.push({ url, localUrl: url, uploaded: true });
         const idx = pendingScreenshots.length - 1;

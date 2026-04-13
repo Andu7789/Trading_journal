@@ -549,7 +549,6 @@ function openSetupModal(setup = null) {
     const screenshots = setup.screenshots || [];
     if (screenshots.length) {
       const previews = document.getElementById('st-screenshot-previews');
-      document.getElementById('st-upload-prompt').style.display = 'none';
       screenshots.forEach(url => {
         pendingSetupScreenshots.push({ url, localUrl: url, uploaded: true });
         const idx = pendingSetupScreenshots.length - 1;
@@ -694,11 +693,16 @@ function addNewPair() {
 //  SCREENSHOT ZONE (scoped to setup modal)
 // =============================================
 function wireScreenshotZone() {
-  const zone   = document.getElementById('st-screenshot-zone');
-  const input  = document.getElementById('st-screenshot-input');
+  const zone = document.getElementById('st-screenshot-zone');
+  let input  = document.getElementById('st-screenshot-input');
   const prompt = document.getElementById('st-upload-prompt');
 
   if (!zone || !input) return;
+
+  // Clone to strip any event listeners added by previous renders
+  const fresh = input.cloneNode(true);
+  input.parentNode.replaceChild(fresh, input);
+  input = fresh;
 
   prompt?.addEventListener('click', () => input.click());
   input.addEventListener('change', () => addSetupFiles(Array.from(input.files)));
