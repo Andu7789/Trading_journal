@@ -66,9 +66,15 @@ export function getWeekRange(date) {
   monday.setDate(d.getDate() - ((day + 6) % 7));
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
+  const toLocal = dt => {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
   return {
-    start: monday.toISOString().split('T')[0],
-    end:   sunday.toISOString().split('T')[0],
+    start: toLocal(monday),
+    end:   toLocal(sunday),
     monday,
     sunday
   };
