@@ -19,7 +19,30 @@ export async function renderNotes(container) {
       <div class="loading-screen"><div class="loading-spinner"></div></div>
     </div>
 
-    <!-- Note Modal -->
+    <!-- Note View Modal (read-only) -->
+    <div id="note-view-modal" class="modal hidden">
+      <div class="modal-backdrop" id="note-view-modal-backdrop"></div>
+      <div class="modal-dialog" style="width:min(640px,95vw)">
+        <div class="modal-header">
+          <div>
+            <h2 id="note-view-date" style="font-size:16px;font-weight:700"></h2>
+            <div id="note-view-tags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div>
+          </div>
+          <button class="modal-close" id="close-note-view-modal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="note-view-content" style="white-space:pre-wrap;line-height:1.7;color:var(--text-primary);font-size:14px"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="note-view-close-btn">Close</button>
+          <button class="btn btn-primary" id="note-view-edit-btn">Edit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Note Edit Modal -->
     <div id="note-modal" class="modal hidden">
       <div class="modal-backdrop" id="note-modal-backdrop"></div>
       <div class="modal-dialog" style="width:min(600px,95vw)">
@@ -60,6 +83,15 @@ export async function renderNotes(container) {
   document.getElementById('note-modal-backdrop').onclick   = closeNoteModal;
   document.getElementById('save-note-btn').onclick         = handleSaveNote;
 
+  document.getElementById('close-note-view-modal').onclick  = closeNoteViewModal;
+  document.getElementById('note-view-close-btn').onclick    = closeNoteViewModal;
+  document.getElementById('note-view-modal-backdrop').onclick = closeNoteViewModal;
+  document.getElementById('note-view-edit-btn').onclick     = () => {
+    const id = document.getElementById('note-view-edit-btn').dataset.id;
+    closeNoteViewModal();
+    openNoteModal(id);
+  };
+
   // Close on Escape
   document.addEventListener('keydown', _escHandler);
 
@@ -76,6 +108,7 @@ async function loadNotes() {
 
   try {
     const notes = await getNotes();
+    _cachedNotes = notes;
 
     if (!notes.length) {
       content.innerHTML = `
@@ -112,6 +145,13 @@ async function loadNotes() {
       </div>
     `;
 
+    content.querySelectorAll('.note-row').forEach(row => {
+      row.style.cursor = 'pointer';
+      row.onclick = (e) => {
+        if (e.target.closest('button')) return; // let Edit/Del buttons work
+        openNoteViewModal(row.dataset.id);
+      };
+    });
     content.querySelectorAll('.note-edit-btn').forEach(btn => {
       btn.onclick = () => openNoteModal(btn.dataset.id);
     });
@@ -129,7 +169,7 @@ function buildNoteRow(note) {
   const preview = firstSentence(note.content);
 
   return `
-    <tr>
+    <tr class="note-row" data-id="${note.id}">
       <td class="td-mono">${formatDate(note.date)}</td>
       <td>
         <div style="display:flex;flex-wrap:wrap;gap:4px">
@@ -156,6 +196,30 @@ function firstSentence(text) {
   if (!text) return '';
   const match = text.match(/^[^.!?\n]+[.!?]?/);
   return match ? match[0].trim() : text.slice(0, 120);
+}
+
+let _cachedNotes = [];
+
+async function openNoteViewModal(id) {
+  try {
+    if (!_cachedNotes.length) _cachedNotes = await getNotes();
+    const note = _cachedNotes.find(n => n.id === id);
+    if (!note) return;
+
+    const tags = Array.isArray(note.tags) ? note.tags.filter(Boolean) : [];
+    document.getElementById('note-view-date').textContent = formatDate(note.date);
+    document.getElementById('note-view-tags').innerHTML = tags.length
+      ? tags.map(t => `<span class="note-tag">${escapeHtml(t)}</span>`).join('')
+      : '';
+    document.getElementById('note-view-content').textContent = note.content || '';
+    document.getElementById('note-view-edit-btn').dataset.id = id;
+
+    document.getElementById('note-view-modal').classList.remove('hidden');
+  } catch {}
+}
+
+function closeNoteViewModal() {
+  document.getElementById('note-view-modal').classList.add('hidden');
 }
 
 function openNoteModal(id) {
