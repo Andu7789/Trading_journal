@@ -22,6 +22,32 @@ export function initSupabase() {
 export function getClient() { return _client; }
 export function isConnected() { return _client !== null; }
 
+// =============================================
+//  AUTH
+// =============================================
+
+export async function getAuthSession() {
+  if (!_client) return null;
+  try {
+    const { data } = await _client.auth.getSession();
+    return data.session;
+  } catch { return null; }
+}
+
+export async function signInWithGoogle() {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { error } = await _client.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + window.location.pathname }
+  });
+  if (error) throw error;
+}
+
+export async function signOut() {
+  if (!_client) return;
+  await _client.auth.signOut();
+}
+
 export async function testConnection() {
   if (!_client) return false;
   try {
