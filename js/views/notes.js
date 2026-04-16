@@ -1,9 +1,11 @@
 // =============================================
 //  NOTES VIEW — General journal / standalone thoughts
 // =============================================
-import { getNotes, saveNote, deleteNote } from '../db.js';
+import { getNotes, saveNote, deleteNote, uploadScreenshot } from '../db.js';
 import { showToast } from '../app.js';
 import { escapeHtml, formatDate, todayString } from '../utils.js';
+
+let pendingNoteScreenshots = []; // { file, localUrl, uploaded } | { url, localUrl, uploaded:true }
 
 export async function renderNotes(container) {
   container.innerHTML = `
@@ -34,6 +36,7 @@ export async function renderNotes(container) {
         </div>
         <div class="modal-body">
           <div id="note-view-content" style="white-space:pre-wrap;line-height:1.7;color:var(--text-primary);font-size:14px"></div>
+          <div id="note-view-screenshots"></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="note-view-close-btn">Close</button>
@@ -67,6 +70,17 @@ export async function renderNotes(container) {
           <div class="form-group">
             <label class="form-label required">Note</label>
             <textarea id="note-content" class="form-textarea" rows="9" placeholder="Write your thoughts, observations or reflections here..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Screenshots</label>
+            <div class="screenshot-zone" id="note-screenshot-zone">
+              <div id="note-screenshot-previews" class="screenshot-previews"></div>
+              <div class="upload-prompt" id="note-upload-prompt">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>Click or drag images here</span>
+              </div>
+              <input type="file" id="note-screenshot-input" accept="image/*" multiple style="display:none">
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -167,6 +181,7 @@ async function loadNotes() {
 function buildNoteRow(note) {
   const tags = Array.isArray(note.tags) ? note.tags.filter(Boolean) : [];
   const preview = firstSentence(note.content);
+  const screenshots = note.screenshots || [];
 
   return `
     <tr class="note-row" data-id="${note.id}">
@@ -181,6 +196,10 @@ function buildNoteRow(note) {
       </td>
       <td style="white-space:normal;max-width:500px">
         <span style="color:var(--text-secondary);font-size:13px">${escapeHtml(preview)}</span>
+        ${screenshots.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
+          ${screenshots.slice(0,3).map(url => `<img src="${url}" style="width:36px;height:28px;object-fit:cover;border-radius:3px;border:1px solid var(--border)">`).join('')}
+          ${screenshots.length > 3 ? `<span class="text-xs text-muted" style="align-self:center">+${screenshots.length-3}</span>` : ''}
+        </div>` : ''}
       </td>
       <td style="text-align:right">
         <div style="display:flex;gap:4px;justify-content:flex-end">
@@ -214,6 +233,17 @@ async function openNoteViewModal(id) {
     document.getElementById('note-view-content').textContent = note.content || '';
     document.getElementById('note-view-edit-btn').dataset.id = id;
 
+    // Screenshots
+    const screenshots = note.screenshots || [];
+    const screenshotsEl = document.getElementById('note-view-screenshots');
+    if (screenshotsEl) {
+      screenshotsEl.innerHTML = screenshots.length
+        ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+            ${screenshots.map(url => `<img src="${url}" style="width:120px;height:90px;object-fit:cover;border-radius:var(--radius);cursor:pointer;border:1px solid var(--border)" onclick="window._viewImage('${url}')" alt="screenshot">`).join('')}
+           </div>`
+        : '';
+    }
+
     document.getElementById('note-view-modal').classList.remove('hidden');
   } catch {}
 }
@@ -230,6 +260,12 @@ function openNoteModal(id) {
   document.getElementById('note-tags').value    = '';
   document.getElementById('note-content').value = '';
 
+  // Reset screenshots
+  pendingNoteScreenshots = [];
+  document.getElementById('note-screenshot-previews').innerHTML = '';
+
+  wireNoteScreenshotZone();
+
   if (id) loadNoteForEdit(id);
 
   modal.classList.remove('hidden');
@@ -245,12 +281,80 @@ async function loadNoteForEdit(id) {
     document.getElementById('note-date').value    = note.date || '';
     document.getElementById('note-tags').value    = Array.isArray(note.tags) ? note.tags.join(', ') : '';
     document.getElementById('note-content').value = note.content || '';
+
+    // Load existing screenshots
+    const screenshots = note.screenshots || [];
+    const previews = document.getElementById('note-screenshot-previews');
+    screenshots.forEach(url => {
+      pendingNoteScreenshots.push({ url, localUrl: url, uploaded: true });
+      const idx = pendingNoteScreenshots.length - 1;
+      const item = document.createElement('div');
+      item.className = 'preview-item';
+      item.dataset.idx = idx;
+      item.innerHTML = `
+        <img src="${url}" alt="screenshot" onclick="window._viewImage('${url}')">
+        <button class="preview-remove" onclick="window._noteRemovePreview(${idx})">×</button>
+      `;
+      previews.appendChild(item);
+    });
   } catch {}
 }
 
 function closeNoteModal() {
   const modal = document.getElementById('note-modal');
   if (modal) modal.classList.add('hidden');
+  pendingNoteScreenshots = [];
+}
+
+function wireNoteScreenshotZone() {
+  const zone   = document.getElementById('note-screenshot-zone');
+  let   input  = document.getElementById('note-screenshot-input');
+  const prompt = document.getElementById('note-upload-prompt');
+  if (!zone || !input) return;
+
+  // Clone to strip old listeners
+  const fresh = input.cloneNode(true);
+  input.parentNode.replaceChild(fresh, input);
+  input = fresh;
+
+  prompt?.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => addNoteFiles(Array.from(input.files)));
+
+  zone.addEventListener('dragover',  (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    addNoteFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
+  });
+
+  window._noteRemovePreview = (idx) => {
+    pendingNoteScreenshots[idx] = null;
+    const item = document.querySelector(`#note-screenshot-previews .preview-item[data-idx="${idx}"]`);
+    if (item) item.remove();
+  };
+}
+
+function addNoteFiles(files) {
+  const previews = document.getElementById('note-screenshot-previews');
+  if (!previews) return;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const url = e.target.result;
+      pendingNoteScreenshots.push({ file, localUrl: url, uploaded: false });
+      const idx = pendingNoteScreenshots.length - 1;
+      const item = document.createElement('div');
+      item.className = 'preview-item';
+      item.dataset.idx = idx;
+      item.innerHTML = `
+        <img src="${url}" alt="screenshot" onclick="window._viewImage('${url}')">
+        <button class="preview-remove" onclick="window._noteRemovePreview(${idx})">×</button>
+      `;
+      previews.appendChild(item);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 async function handleSaveNote() {
@@ -265,11 +369,26 @@ async function handleSaveNote() {
   saveBtn.textContent = 'Saving...';
 
   try {
+    // Upload any new screenshots
+    const screenshotUrls = [];
+    for (const item of pendingNoteScreenshots) {
+      if (!item) continue;
+      if (item.uploaded) {
+        screenshotUrls.push(item.url);
+      } else {
+        try {
+          const url = await uploadScreenshot(item.file);
+          screenshotUrls.push(url);
+        } catch { /* skip failed uploads */ }
+      }
+    }
+
     const data = {
-      id:      document.getElementById('note-id').value || undefined,
+      id:          document.getElementById('note-id').value || undefined,
       date,
       content,
-      tags:    document.getElementById('note-tags').value,
+      tags:        document.getElementById('note-tags').value,
+      screenshots: screenshotUrls,
     };
     if (!data.id) delete data.id;
 
