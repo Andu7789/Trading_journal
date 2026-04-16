@@ -410,7 +410,6 @@ function addFiles(files) {
         <button class="preview-remove" onclick="removePreview(${idx})">×</button>
       `;
       previews.appendChild(item);
-      if (prompt) prompt.style.display = 'none';
     };
     reader.readAsDataURL(file);
   });
@@ -420,12 +419,6 @@ window.removePreview = function(idx) {
   pendingScreenshots[idx] = null;
   const item = document.querySelector(`.preview-item[data-idx="${idx}"]`);
   if (item) item.remove();
-
-  // Show prompt if no previews left
-  if (pendingScreenshots.every(s => !s)) {
-    const prompt = document.getElementById('upload-prompt');
-    if (prompt) prompt.style.display = '';
-  }
 };
 
 export function openTradeModal(id = null, date = null, callback = null) {
