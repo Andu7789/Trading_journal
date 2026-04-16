@@ -124,6 +124,14 @@ export async function getTrades(filters = {}) {
   return data || [];
 }
 
+export async function getDistinctSymbols() {
+  if (!_client) return [];
+  try {
+    const { data } = await _client.from('trades').select('symbol').order('symbol');
+    return [...new Set((data || []).map(r => r.symbol).filter(Boolean))].sort();
+  } catch { return []; }
+}
+
 export async function getTradeById(id) {
   if (!_client) throw new Error('Not connected to Supabase');
   const { data, error } = await _client

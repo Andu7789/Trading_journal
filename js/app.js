@@ -2,7 +2,7 @@
 //  APP.JS — Main SPA Controller
 // =============================================
 import { initSupabase, isConnected, testConnection, saveTrade,
-         getTradeById, uploadScreenshot,
+         getTradeById, getDistinctSymbols, uploadScreenshot,
          getAuthSession, signInWithGoogle, signOut } from './db.js';
 import { todayString, calcRR, tiltLabel, tiltClass, formatCurrency } from './utils.js';
 
@@ -467,6 +467,12 @@ export function openTradeModal(id = null, date = null, callback = null) {
   } else {
     titleEl.textContent = 'Add Trade';
   }
+
+  // Populate symbol suggestions from past trades
+  getDistinctSymbols().then(symbols => {
+    const list = document.getElementById('symbol-datalist');
+    if (list) list.innerHTML = symbols.map(s => `<option value="${s}">`).join('');
+  });
 
   modal.classList.remove('hidden');
 }
