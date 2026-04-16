@@ -604,7 +604,7 @@ async function handleSaveTrade() {
       strategy:     document.getElementById('trade-strategy').value.trim() || null,
       timeframe:    document.getElementById('trade-timeframe').value || null,
       session:      document.getElementById('trade-session').value || null,
-      outcome:      document.getElementById('trade-outcome').value || null,
+      outcome:      tradeType === 'missed' ? null : (document.getElementById('trade-outcome').value || null),
       emotion:      document.getElementById('trade-emotion').value || null,
       tilt_meter:   parseInt(document.getElementById('trade-tilt').value) || null,
       followed_plan: followedPlan || null,

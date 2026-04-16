@@ -142,7 +142,7 @@ export function calcStats(trades) {
 
   return {
     total: closed.length,
-    open:  trades.filter(t => !t.outcome || t.outcome === 'open').length,
+    open:  trades.filter(t => t.trade_type !== 'missed' && (!t.outcome || t.outcome === 'open')).length,
     wins:  wins.length,
     losses: losses.length,
     bes:   bes.length,

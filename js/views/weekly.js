@@ -216,7 +216,7 @@ function buildWeekTradeTable(trades) {
               <td class="td-mono">${t.exit_price ?? '—'}</td>
               <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
               <td class="td-mono">${t.risk_reward ? t.risk_reward + 'R' : '—'}</td>
-              <td>${getOutcomeBadge(t.outcome)}</td>
+              <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
               <td class="text-sm text-muted">${t.strategy || '—'}</td>
               <td class="text-sm text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${t.notes ? t.notes.slice(0,60) + (t.notes.length > 60 ? '...' : '') : '—'}</td>
             </tr>
