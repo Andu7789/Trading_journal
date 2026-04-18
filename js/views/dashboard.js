@@ -127,7 +127,7 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
                     <td><strong>${t.symbol}</strong></td>
                     <td>${getDirectionBadge(t.direction)}</td>
                     <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
-                    <td>${getOutcomeBadge(t.outcome)}</td>
+                    <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
                     <td class="text-muted text-sm">${t.strategy || '—'}</td>
                   </tr>
                 `).join('')}
