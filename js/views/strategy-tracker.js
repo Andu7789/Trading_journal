@@ -69,6 +69,9 @@ function buildShell() {
       <div class="loading-screen" style="padding:20px"><div class="loading-spinner"></div></div>
     </div>
 
+    <!-- Breakdown charts -->
+    <div id="st-breakdown-charts" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px"></div>
+
     <!-- Week nav -->
     <div class="week-nav" style="margin-bottom:16px">
       <button class="btn btn-ghost btn-sm" id="st-week-prev">‹ Prev Week</button>
@@ -124,6 +127,7 @@ async function loadAllTimeAndChart() {
     const stats = calcSetupStats(allSetups);
     if (statsEl) statsEl.innerHTML = buildAllTimeStats(stats);
     renderChartSection(allSetups);
+    renderBreakdownCharts(allSetups);
   } catch (err) {
     if (statsEl) statsEl.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
     if (chartEl) chartEl.innerHTML = `<p class="text-loss text-sm" style="padding:20px">${err.message}</p>`;
@@ -329,6 +333,113 @@ function drawWeeklyChart(allWeeks, weekMap, filter) {
       }
     }
   });
+}
+
+// =============================================
+//  BREAKDOWN CHARTS (Day of Week + By Pair)
+// =============================================
+function renderBreakdownCharts(allSetups) {
+  const el = document.getElementById('st-breakdown-charts');
+  if (!el) return;
+
+  const closed = allSetups.filter(s => s.outcome === 'win' || s.outcome === 'loss' || s.outcome === 'breakeven');
+  if (!closed.length) { el.innerHTML = ''; return; }
+
+  el.innerHTML = `
+    <div class="card" style="padding:20px">
+      <div class="card-title" style="font-size:14px;margin-bottom:16px">R by Day of Week</div>
+      <div style="position:relative;height:180px"><canvas id="st-dow-chart"></canvas></div>
+    </div>
+    <div class="card" style="padding:20px">
+      <div class="card-title" style="font-size:14px;margin-bottom:16px">R by Pair</div>
+      <div style="position:relative;height:180px"><canvas id="st-pair-chart"></canvas></div>
+    </div>
+  `;
+
+  _drawDowChart(closed);
+  _drawPairChart(closed);
+}
+
+function _calcR(setups) {
+  const wins   = setups.filter(s => s.outcome === 'win');
+  const losses = setups.filter(s => s.outcome === 'loss');
+  return parseFloat((wins.reduce((s, x) => s + (parseFloat(x.possible_r) || 0), 0) - losses.length).toFixed(2));
+}
+
+function _winRate(setups) {
+  const closed = setups.filter(s => s.outcome === 'win' || s.outcome === 'loss' || s.outcome === 'breakeven');
+  if (!closed.length) return 0;
+  return parseFloat((closed.filter(s => s.outcome === 'win').length / closed.length * 100).toFixed(1));
+}
+
+function _barChart(canvasId, labels, rData, wrData) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  if (canvas._chart) canvas._chart.destroy();
+
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Total R',
+          data: rData,
+          backgroundColor: rData.map(v => v >= 0 ? 'rgba(0,217,126,0.75)' : 'rgba(255,71,87,0.75)'),
+          borderColor:     rData.map(v => v >= 0 ? '#00d97e' : '#ff4757'),
+          borderWidth: 1, borderRadius: 4, yAxisID: 'y',
+        },
+        {
+          label: 'Win %',
+          data: wrData,
+          type: 'line',
+          borderColor: '#3d7ef0', borderWidth: 2,
+          pointRadius: 4, pointBackgroundColor: '#3d7ef0',
+          yAxisID: 'y2', tension: 0,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels: { color: '#94a3b8', font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Win %' ? `${ctx.parsed.y}%` : `${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}R` } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+        y:  { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => `${v}R` }, position: 'left' },
+        y2: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => `${v}%` }, position: 'right', min: 0, max: 100 }
+      }
+    }
+  });
+}
+
+function _drawDowChart(setups) {
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const byDay = {};
+  days.forEach(d => byDay[d] = []);
+
+  setups.forEach(s => {
+    if (!s.date) return;
+    const dow = new Date(s.date + 'T00:00:00').getDay();
+    const name = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dow];
+    if (byDay[name]) byDay[name].push(s);
+  });
+
+  const active = days.filter(d => byDay[d].length);
+  _barChart('st-dow-chart', active, active.map(d => _calcR(byDay[d])), active.map(d => _winRate(byDay[d])));
+}
+
+function _drawPairChart(setups) {
+  const byPair = {};
+  setups.forEach(s => {
+    const p = s.pair || 'Unknown';
+    if (!byPair[p]) byPair[p] = [];
+    byPair[p].push(s);
+  });
+
+  const pairs = Object.keys(byPair).sort((a, b) => _calcR(byPair[b]) - _calcR(byPair[a]));
+  _barChart('st-pair-chart', pairs, pairs.map(p => _calcR(byPair[p])), pairs.map(p => _winRate(byPair[p])));
 }
 
 // =============================================
