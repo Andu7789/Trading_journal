@@ -3,9 +3,12 @@
 // =============================================
 import { getTrades } from '../db.js';
 import { calcStats, formatCurrency, groupBy, sum, todayString,
-         getMonthRange, pnlSign, pnlClass } from '../utils.js';
+         getMonthRange, pnlSign, pnlClass, formatDate,
+         getDirectionBadge, getOutcomeBadge, nl2br } from '../utils.js';
+import { openTradeModal } from '../app.js';
 
 let charts = {};
+let _distBuckets = [];
 
 export async function renderAnalytics(container) {
   document.getElementById('page-title').textContent = 'Analytics';
@@ -144,6 +147,9 @@ function buildAnalyticsLayout(trades) {
       </div>
     </div>
 
+    <!-- Distribution drill-down (shown on bar click) -->
+    <div id="dist-drilldown" style="display:none;margin-bottom:16px"></div>
+
     <!-- Row 2: By pair + By session -->
     <div class="analytics-grid" style="margin-bottom:16px">
       <div class="card">
@@ -256,35 +262,119 @@ function renderEquityCurve(trades) {
 }
 
 function renderDistribution(trades) {
-  const wins   = trades.filter(t => t.outcome === 'win').map(t => parseFloat(t.pnl));
-  const losses = trades.filter(t => t.outcome === 'loss').map(t => parseFloat(t.pnl));
-
-  // Bucket into ranges
   const allPnl = trades.map(t => parseFloat(t.pnl) || 0);
   const min = Math.floor(Math.min(...allPnl));
   const max = Math.ceil(Math.max(...allPnl));
   const bucketCount = Math.min(20, trades.length);
   const bucketSize  = (max - min) / bucketCount || 1;
 
-  const buckets = Array.from({ length: bucketCount }, (_, i) => ({
+  _distBuckets = Array.from({ length: bucketCount }, (_, i) => ({
     label: `${Math.round(min + i * bucketSize)}`,
-    count: 0,
+    rangeStart: min + i * bucketSize,
+    rangeEnd: min + (i + 1) * bucketSize,
+    trades: [],
     color: (min + i * bucketSize) >= 0 ? 'rgba(0,217,126,0.7)' : 'rgba(255,71,87,0.7)'
   }));
 
-  allPnl.forEach(pnl => {
+  trades.forEach(t => {
+    const pnl = parseFloat(t.pnl) || 0;
     const idx = Math.min(Math.floor((pnl - min) / bucketSize), bucketCount - 1);
-    if (idx >= 0 && idx < bucketCount) buckets[idx].count++;
+    if (idx >= 0 && idx < bucketCount) _distBuckets[idx].trades.push(t);
   });
+
+  const opts = chartOptions({ xLabel: 'P&L ($)', yLabel: 'Trades', legend: false });
+  opts.onClick = (e, elements) => {
+    if (!elements.length) return;
+    showDistDrilldown(elements[0].index);
+  };
+  opts.onHover = (e, elements) => {
+    e.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+  };
 
   charts.distribution = new Chart(document.getElementById('chart-distribution'), {
     type: 'bar',
     data: {
-      labels: buckets.map(b => b.label),
-      datasets: [{ data: buckets.map(b => b.count), backgroundColor: buckets.map(b => b.color), borderWidth: 0 }]
+      labels: _distBuckets.map(b => b.label),
+      datasets: [{ data: _distBuckets.map(b => b.trades.length), backgroundColor: _distBuckets.map(b => b.color), borderWidth: 0 }]
     },
-    options: chartOptions({ xLabel: 'P&L ($)', yLabel: 'Trades', legend: false })
+    options: opts
   });
+}
+
+function showDistDrilldown(idx) {
+  const panel = document.getElementById('dist-drilldown');
+  if (!panel) return;
+  const bucket = _distBuckets[idx];
+  if (!bucket || !bucket.trades.length) { panel.style.display = 'none'; return; }
+
+  const { rangeStart, rangeEnd, trades } = bucket;
+  const rangeLabel = `${formatCurrency(rangeStart)} to ${formatCurrency(rangeEnd)}`;
+
+  panel.style.display = '';
+  panel.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Trades in range: ${rangeLabel}</div>
+          <div class="card-subtitle">${trades.length} trade${trades.length !== 1 ? 's' : ''}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('dist-drilldown').style.display='none'">✕ Close</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th>
+              <th>P&amp;L</th><th>R:R</th><th>Outcome</th><th>Strategy</th><th>Notes</th><th></th>
+            </tr>
+          </thead>
+          <tbody>${trades.map(t => buildDistTradeRow(t)).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  panel.querySelectorAll('.dist-trade-row').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('button')) return;
+      document.getElementById(`dist-detail-${row.dataset.id}`)?.classList.toggle('hidden');
+    };
+  });
+
+  panel.querySelectorAll('.dist-edit-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      openTradeModal(btn.dataset.id, null, () => loadAnalytics());
+    };
+  });
+
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function buildDistTradeRow(t) {
+  const hasDetails = t.notes || t.mistakes || t.screenshots?.length;
+  return `
+    <tr class="dist-trade-row" data-id="${t.id}" style="cursor:pointer" title="Click to expand">
+      <td class="td-mono">${formatDate(t.date)}</td>
+      <td><strong>${t.symbol}</strong></td>
+      <td>${getDirectionBadge(t.direction)}</td>
+      <td class="td-mono">${t.entry_price ?? '—'}</td>
+      <td class="td-mono">${t.exit_price ?? '—'}</td>
+      <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
+      <td class="td-mono">${t.risk_reward ? t.risk_reward + 'R' : '—'}</td>
+      <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
+      <td class="text-sm text-muted">${t.strategy || '—'}</td>
+      <td class="text-sm text-muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.notes ? t.notes.slice(0,60) + (t.notes.length > 60 ? '…' : '') : '—'}</td>
+      <td><button class="btn btn-ghost btn-xs dist-edit-btn" data-id="${t.id}">Edit</button></td>
+    </tr>
+    ${hasDetails ? `
+    <tr id="dist-detail-${t.id}" class="hidden">
+      <td colspan="11" style="background:var(--bg-surface);padding:12px 20px">
+        ${t.notes ? `<div class="text-sm mb-8" style="line-height:1.6;color:var(--text-secondary)">${nl2br(t.notes)}</div>` : ''}
+        ${t.screenshots?.length ? `<div class="screenshots-grid">${t.screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewImage('${url}')" alt="screenshot">`).join('')}</div>` : ''}
+      </td>
+    </tr>` : ''}
+  `;
 }
 
 function renderBySymbol(trades) {
