@@ -830,9 +830,6 @@ function wireScreenshotZone() {
     pendingSetupScreenshots[idx] = null;
     const item = document.querySelector(`#st-screenshot-previews .preview-item[data-idx="${idx}"]`);
     if (item) item.remove();
-    if (pendingSetupScreenshots.every(s => !s)) {
-      document.getElementById('st-upload-prompt').style.display = '';
-    }
   };
 }
 

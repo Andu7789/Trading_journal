@@ -107,6 +107,7 @@ export async function renderNotes(container) {
   };
 
   // Close on Escape
+  document.removeEventListener('keydown', _escHandler);
   document.addEventListener('keydown', _escHandler);
 
   await loadNotes();
@@ -237,11 +238,13 @@ async function openNoteViewModal(id) {
     const screenshots = note.screenshots || [];
     const screenshotsEl = document.getElementById('note-view-screenshots');
     if (screenshotsEl) {
-      screenshotsEl.innerHTML = screenshots.length
-        ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      if (screenshots.length) {
+        screenshotsEl.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
             ${screenshots.map(url => `<img src="${url}" style="width:120px;height:90px;object-fit:cover;border-radius:var(--radius);cursor:pointer;border:1px solid var(--border)" onclick="window._viewImage('${url}')" alt="screenshot">`).join('')}
-           </div>`
-        : '';
+           </div>`;
+      } else {
+        screenshotsEl.innerHTML = '';
+      }
     }
 
     document.getElementById('note-view-modal').classList.remove('hidden');
@@ -274,7 +277,7 @@ function openNoteModal(id) {
 
 async function loadNoteForEdit(id) {
   try {
-    const notes = await getNotes();
+    const notes = _cachedNotes.length ? _cachedNotes : await getNotes();
     const note  = notes.find(n => n.id === id);
     if (!note) return;
     document.getElementById('note-id').value      = note.id;
