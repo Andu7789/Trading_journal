@@ -9,6 +9,7 @@ import { openTradeModal } from '../app.js';
 
 let charts = {};
 let _distBuckets = [];
+let _dowByDay = {};
 
 export async function renderAnalytics(container) {
   document.getElementById('page-title').textContent = 'Analytics';
@@ -173,6 +174,9 @@ function buildAnalyticsLayout(trades) {
         <div class="chart-wrapper"><canvas id="chart-by-strategy"></canvas></div>
       </div>
     </div>
+
+    <!-- DOW drill-down (shown on bar click) -->
+    <div id="dow-drilldown" style="display:none;margin-bottom:16px"></div>
 
     <!-- Row 4: Emotion analysis + Tilt meter -->
     <div class="analytics-grid" style="margin-bottom:16px">
@@ -438,23 +442,39 @@ function renderBySession(trades) {
 
 function renderByDayOfWeek(trades) {
   const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const byDow = {};
-  days.forEach(d => byDow[d] = []);
+  _dowByDay = {};
+  days.forEach(d => _dowByDay[d] = []);
 
   trades.forEach(t => {
     if (!t.date) return;
     const dow = new Date(t.date + 'T00:00:00').getDay();
     const name = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dow];
-    if (byDow[name]) byDow[name].push(t);
+    if (_dowByDay[name]) _dowByDay[name].push(t);
   });
 
-  const activeDays = days.filter(d => byDow[d].length);
-  const pnls = activeDays.map(d => parseFloat(sum(byDow[d], 'pnl').toFixed(2)));
+  const activeDays = days.filter(d => _dowByDay[d].length);
+  const pnls = activeDays.map(d => parseFloat(sum(_dowByDay[d], 'pnl').toFixed(2)));
   const winRates = activeDays.map(d => {
-    const ts = byDow[d];
+    const ts = _dowByDay[d];
     const wins = ts.filter(t => t.outcome === 'win').length;
     return ts.length ? parseFloat((wins / ts.length * 100).toFixed(1)) : 0;
   });
+
+  const opts = {
+    ...chartOptions({ legend: true }),
+    scales: {
+      x: xScale(),
+      y:  { ...yScale(), position: 'left' },
+      y2: { ...yScale(), position: 'right', grid: { display: false }, min: 0, max: 100 }
+    },
+    onClick: (e, elements) => {
+      if (!elements.length) return;
+      showDowDrilldown(activeDays[elements[0].index]);
+    },
+    onHover: (e, elements) => {
+      e.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+    }
+  };
 
   charts.byDow = new Chart(document.getElementById('chart-by-dow'), {
     type: 'bar',
@@ -465,15 +485,62 @@ function renderByDayOfWeek(trades) {
         { label: 'Win Rate %', data: winRates, type: 'line', borderColor: '#3d7ef0', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#3d7ef0', yAxisID: 'y2', tension: 0 }
       ]
     },
-    options: {
-      ...chartOptions({ legend: true }),
-      scales: {
-        x: xScale(),
-        y:  { ...yScale(), position: 'left' },
-        y2: { ...yScale(), position: 'right', grid: { display: false }, min: 0, max: 100 }
-      }
-    }
+    options: opts
   });
+}
+
+function showDowDrilldown(dayName) {
+  const panel = document.getElementById('dow-drilldown');
+  if (!panel) return;
+  const trades = _dowByDay[dayName];
+  if (!trades?.length) { panel.style.display = 'none'; return; }
+
+  const totalPnl = parseFloat(sum(trades, 'pnl').toFixed(2));
+  const wins = trades.filter(t => t.outcome === 'win').length;
+  const winRate = (wins / trades.length * 100).toFixed(1);
+
+  panel.style.display = '';
+  panel.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${dayName} — ${trades.length} trade${trades.length !== 1 ? 's' : ''}</div>
+          <div class="card-subtitle">
+            <span class="${pnlClass(totalPnl)}">${pnlSign(totalPnl)}${formatCurrency(totalPnl)}</span>
+            &nbsp;·&nbsp;${winRate}% win rate
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('dow-drilldown').style.display='none'">✕ Close</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th>
+              <th>P&amp;L</th><th>R:R</th><th>Outcome</th><th>Strategy</th><th>Notes</th><th></th>
+            </tr>
+          </thead>
+          <tbody>${trades.map(t => buildDistTradeRow(t)).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  panel.querySelectorAll('.dist-trade-row').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('button')) return;
+      document.getElementById(`dist-detail-${row.dataset.id}`)?.classList.toggle('hidden');
+    };
+  });
+
+  panel.querySelectorAll('.dist-edit-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      openTradeModal(btn.dataset.id, null, () => loadAnalytics());
+    };
+  });
+
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function renderByStrategy(trades) {
