@@ -233,7 +233,7 @@ function buildScreenshots(trades) {
   if (!allScreenshots.length) return '';
   return `
     <div class="screenshots-grid" style="margin-bottom:16px">
-      ${allScreenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewImage('${url}')" alt="screenshot">`).join('')}
+      ${allScreenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">`).join('')}
     </div>
   `;
 }

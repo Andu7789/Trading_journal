@@ -375,7 +375,7 @@ function buildDistTradeRow(t) {
     <tr id="dist-detail-${t.id}" class="hidden">
       <td colspan="11" style="background:var(--bg-surface);padding:12px 20px">
         ${t.notes ? `<div class="text-sm mb-8" style="line-height:1.6;color:var(--text-secondary)">${nl2br(t.notes)}</div>` : ''}
-        ${t.screenshots?.length ? `<div class="screenshots-grid">${t.screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewImage('${url}')" alt="screenshot">`).join('')}</div>` : ''}
+        ${t.screenshots?.length ? `<div class="screenshots-grid">${t.screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">`).join('')}</div>` : ''}
       </td>
     </tr>` : ''}
   `;

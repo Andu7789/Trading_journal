@@ -352,7 +352,7 @@ function buildScreenshots(trades) {
       <div class="text-xs text-muted mb-8">Trade Screenshots</div>
       <div class="screenshots-grid">
         ${allScreenshots.map(url => `
-          <img src="${url}" class="screenshot-thumb" onclick="window._viewImage('${url}')" alt="screenshot">
+          <img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">
         `).join('')}
       </div>
     </div>

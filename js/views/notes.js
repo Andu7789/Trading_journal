@@ -239,8 +239,8 @@ async function openNoteViewModal(id) {
     const screenshotsEl = document.getElementById('note-view-screenshots');
     if (screenshotsEl) {
       if (screenshots.length) {
-        screenshotsEl.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
-            ${screenshots.map(url => `<img src="${url}" style="width:120px;height:90px;object-fit:cover;border-radius:var(--radius);cursor:pointer;border:1px solid var(--border)" onclick="window._viewImage('${url}')" alt="screenshot">`).join('')}
+        screenshotsEl.innerHTML = `<div class="screenshots-grid" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+            ${screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">`).join('')}
            </div>`;
       } else {
         screenshotsEl.innerHTML = '';

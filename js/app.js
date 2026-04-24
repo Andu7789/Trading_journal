@@ -709,11 +709,16 @@ window._viewImage = function(url, gallery) {
   _showImageAt(_galleryIdx);
 };
 
-// Open carousel by collecting sibling images from the nearest previews container.
+// Open carousel by collecting sibling images from the nearest container.
 window._viewPreview = function(imgEl) {
-  const container = imgEl.closest('.screenshot-previews');
-  if (container) {
-    const imgs  = Array.from(container.querySelectorAll('.preview-item img'));
+  const previewContainer = imgEl.closest('.screenshot-previews');
+  const gridContainer    = imgEl.closest('.screenshots-grid');
+  if (previewContainer) {
+    const imgs  = Array.from(previewContainer.querySelectorAll('.preview-item img'));
+    _gallery    = imgs.map(i => i.src);
+    _galleryIdx = imgs.indexOf(imgEl);
+  } else if (gridContainer) {
+    const imgs  = Array.from(gridContainer.querySelectorAll('img'));
     _gallery    = imgs.map(i => i.src);
     _galleryIdx = imgs.indexOf(imgEl);
   } else {
