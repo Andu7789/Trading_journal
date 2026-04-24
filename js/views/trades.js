@@ -298,7 +298,7 @@ function buildTradeRow(t) {
           <div class="mt-8">
             <div class="text-xs text-muted mb-8">Screenshots</div>
             <div class="screenshots-grid">
-              ${t.screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewImage('${url}')" alt="screenshot">`).join('')}
+              ${t.screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewImage('${url}',${JSON.stringify(t.screenshots)})" alt="screenshot">`).join('')}
             </div>
           </div>
         ` : ''}
