@@ -548,7 +548,7 @@ function buildSetupRow(s) {
   const screenshots = s.screenshots || [];
   const screenshotCell = screenshots.length
     ? `<div style="display:flex;gap:4px;flex-wrap:wrap">${screenshots.slice(0,3).map(url =>
-        `<img src="${url}" style="width:40px;height:30px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="window._viewImage('${url}')" alt="screenshot">`
+        `<img src="${url}" style="width:40px;height:30px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="window._viewImage('${url}',${JSON.stringify(screenshots)})" alt="screenshot">`
       ).join('')}${screenshots.length > 3 ? `<span class="text-xs text-muted" style="align-self:center">+${screenshots.length - 3}</span>` : ''}</div>`
     : '—';
 
@@ -667,7 +667,7 @@ function openSetupModal(setup = null) {
         item.className = 'preview-item';
         item.dataset.idx = idx;
         item.innerHTML = `
-          <img src="${url}" alt="screenshot" onclick="window._viewImage('${url}')">
+          <img src="${url}" alt="screenshot" onclick="window._viewPreview(this)">
           <button class="preview-remove" onclick="window._stRemovePreview(${idx})">×</button>
         `;
         previews.appendChild(item);

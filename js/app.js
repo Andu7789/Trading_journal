@@ -22,6 +22,10 @@ let currentView    = null;
 let tradeCallback  = null;
 let pendingScreenshots = []; // { file, url } for new uploads; or { url } for existing
 
+// ---- Image carousel state ----
+let _gallery    = [];
+let _galleryIdx = 0;
+
 // =============================================
 //  BOOT
 // =============================================
@@ -406,7 +410,7 @@ function addFiles(files) {
       item.className = 'preview-item';
       item.dataset.idx = idx;
       item.innerHTML = `
-        <img src="${url}" alt="screenshot" onclick="window._viewImage('${url}')">
+        <img src="${url}" alt="screenshot" onclick="window._viewPreview(this)">
         <button class="preview-remove" onclick="removePreview(${idx})">×</button>
       `;
       previews.appendChild(item);
@@ -646,23 +650,50 @@ function parseFloatOrNull(id) {
 }
 
 // =============================================
-//  IMAGE MODAL
+//  IMAGE MODAL / CAROUSEL
 // =============================================
 function setupImageModal() {
-  const modal     = document.getElementById('image-modal');
-  const backdrop  = document.getElementById('image-modal-backdrop');
-  const closeBtn  = document.getElementById('close-image-modal');
+  const backdrop = document.getElementById('image-modal-backdrop');
+  const closeBtn = document.getElementById('close-image-modal');
+  const prevBtn  = document.getElementById('image-modal-prev');
+  const nextBtn  = document.getElementById('image-modal-next');
 
   if (backdrop) backdrop.onclick = closeImageModal;
   if (closeBtn) closeBtn.onclick = closeImageModal;
+  if (prevBtn)  prevBtn.onclick  = () => _galleryStep(-1);
+  if (nextBtn)  nextBtn.onclick  = () => _galleryStep(1);
 
-  // Escape key
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeTradeModal();
-      closeImageModal();
-    }
+    const modal = document.getElementById('image-modal');
+    const open  = modal && !modal.classList.contains('hidden');
+    if (e.key === 'Escape') { closeTradeModal(); closeImageModal(); }
+    if (open && e.key === 'ArrowLeft')  { e.preventDefault(); _galleryStep(-1); }
+    if (open && e.key === 'ArrowRight') { e.preventDefault(); _galleryStep(1); }
   });
+}
+
+function _galleryStep(dir) {
+  if (_gallery.length < 2) return;
+  _galleryIdx = (_galleryIdx + dir + _gallery.length) % _gallery.length;
+  _showImageAt(_galleryIdx);
+}
+
+function _showImageAt(idx) {
+  const modal   = document.getElementById('image-modal');
+  const img     = document.getElementById('modal-image');
+  const prevBtn = document.getElementById('image-modal-prev');
+  const nextBtn = document.getElementById('image-modal-next');
+  const counter = document.getElementById('image-modal-counter');
+  if (!modal || !img) return;
+
+  img.src = _gallery[idx];
+
+  const multi = _gallery.length > 1;
+  if (prevBtn) prevBtn.style.display = multi ? '' : 'none';
+  if (nextBtn) nextBtn.style.display = multi ? '' : 'none';
+  if (counter) counter.textContent   = multi ? `${idx + 1} / ${_gallery.length}` : '';
+
+  modal.classList.remove('hidden');
 }
 
 function closeImageModal() {
@@ -670,13 +701,27 @@ function closeImageModal() {
   if (modal) modal.classList.add('hidden');
 }
 
-// Global: view image
-window._viewImage = function(url) {
-  const modal = document.getElementById('image-modal');
-  const img   = document.getElementById('modal-image');
-  if (!modal || !img) return;
-  img.src = url;
-  modal.classList.remove('hidden');
+// Open a single image or a gallery. gallery is optional array of URLs.
+window._viewImage = function(url, gallery) {
+  _gallery    = Array.isArray(gallery) && gallery.length ? gallery : [url];
+  _galleryIdx = _gallery.indexOf(url);
+  if (_galleryIdx < 0) _galleryIdx = 0;
+  _showImageAt(_galleryIdx);
+};
+
+// Open carousel by collecting sibling images from the nearest previews container.
+window._viewPreview = function(imgEl) {
+  const container = imgEl.closest('.screenshot-previews');
+  if (container) {
+    const imgs  = Array.from(container.querySelectorAll('.preview-item img'));
+    _gallery    = imgs.map(i => i.src);
+    _galleryIdx = imgs.indexOf(imgEl);
+  } else {
+    _gallery    = [imgEl.src];
+    _galleryIdx = 0;
+  }
+  if (_galleryIdx < 0) _galleryIdx = 0;
+  _showImageAt(_galleryIdx);
 };
 
 // =============================================
