@@ -19,6 +19,9 @@ const FEED_PATHS = [
 // Currencies we care about (matches user's pairs + USD as driver)
 const WATCHED = ['GBP', 'EUR', 'USD'];
 
+// Last fetch status — readable by callers to surface errors in the UI
+export let newsFetchStatus = { ok: true, error: null };
+
 // ---- Public API ----
 
 /**
@@ -69,6 +72,7 @@ export async function getNewsForRange(startDate, endDate) {
 
 async function fetchFeedPath(path) {
   const target = FF_BASE + path;
+  const errors = [];
   for (const proxy of PROXIES) {
     try {
       const r    = await fetch(proxy + encodeURIComponent(target));
@@ -78,10 +82,13 @@ async function fetchFeedPath(path) {
         console.log(`[News] ${path} OK via ${proxy.includes('allorigins') ? 'allorigins' : 'corsproxy'} (${parsed.length} events)`);
         return parsed;
       }
-    } catch {}
+      errors.push(`${proxy.includes('allorigins') ? 'allorigins' : 'corsproxy'}: empty response`);
+    } catch (e) {
+      errors.push(`${proxy.includes('allorigins') ? 'allorigins' : 'corsproxy'}: ${e.message}`);
+    }
   }
-  console.warn('[News] All proxies failed for', path);
-  return [];
+  console.warn('[News] All proxies failed for', path, errors);
+  throw new Error(`${path}: ${errors.join('; ')}`);
 }
 
 async function fetchAll() {
@@ -95,27 +102,31 @@ async function fetchAll() {
   } catch {}
 
   // Fetch all feed paths in parallel, each with proxy fallback
-  try {
-    const results = await Promise.allSettled(FEED_PATHS.map(fetchFeedPath));
+  const results = await Promise.allSettled(FEED_PATHS.map(fetchFeedPath));
 
-    const data = results
-      .filter(r => r.status === 'fulfilled')
-      .flatMap(r => Array.isArray(r.value) ? r.value : []);
+  const failed  = results.filter(r => r.status === 'rejected').map(r => r.reason?.message || 'unknown');
+  const data    = results
+    .filter(r => r.status === 'fulfilled')
+    .flatMap(r => Array.isArray(r.value) ? r.value : []);
 
-    console.log('[News] Fetched', data.length, 'events. Sample:', data[0]);
-
-    // Cache it (only if we got actual data)
-    if (data.length > 0) {
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
-      } catch {}
-    }
-
-    return data;
-  } catch (err) {
-    console.warn('[News] Feed fetch failed:', err.message);
-    return [];
+  if (failed.length && data.length === 0) {
+    newsFetchStatus = { ok: false, error: `News fetch failed — ${failed[0]}` };
+  } else if (failed.length) {
+    newsFetchStatus = { ok: true, error: `Partial load (${results.filter(r=>r.status==='fulfilled').length}/${FEED_PATHS.length} feeds)` };
+  } else {
+    newsFetchStatus = { ok: true, error: null };
   }
+
+  console.log('[News] Fetched', data.length, 'events. Sample:', data[0]);
+
+  // Cache it (only if we got actual data)
+  if (data.length > 0) {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+    } catch {}
+  }
+
+  return data;
 }
 
 // Export helpers for use in buildNewsStrip

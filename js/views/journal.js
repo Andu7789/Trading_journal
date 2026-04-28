@@ -6,7 +6,7 @@ import { todayString, formatDate, addDays, calcStats, formatCurrency,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          tiltLabel, tiltClass, nl2br, debounce } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
-import { getNewsForDate, eventTime } from '../news.js';
+import { getNewsForDate, eventTime, newsFetchStatus } from '../news.js';
 
 let currentDate = todayString();
 let saveTimer = null;
@@ -69,7 +69,7 @@ async function loadJournalDay(date) {
       getJournalEntry(yesterday),
       getNewsForDate(date),
     ]);
-    body.innerHTML = buildJournalBody(date, entry || {}, trades, prevEntry, news);
+    body.innerHTML = buildJournalBody(date, entry || {}, trades, prevEntry, news, newsFetchStatus);
     initJournalInteractions(date, entry || {});
   } catch (err) {
     console.error('Journal load error:', err);
@@ -77,7 +77,7 @@ async function loadJournalDay(date) {
   }
 }
 
-function buildJournalBody(date, entry, trades, prevEntry, news = []) {
+function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus = { ok: true, error: null }) {
   const stats = calcStats(trades);
   const isToday = date === todayString();
   const dayLabel = formatDateLong(date);
@@ -106,7 +106,7 @@ function buildJournalBody(date, entry, trades, prevEntry, news = []) {
       ` : ''}
     </div>
 
-    ${buildNewsStrip(news)}
+    ${buildNewsStrip(news, fetchStatus)}
 
     <div class="journal-sections" id="journal-sections">
 
@@ -259,8 +259,23 @@ function buildJournalBody(date, entry, trades, prevEntry, news = []) {
   `;
 }
 
-function buildNewsStrip(news) {
-  if (!news.length) return '';
+function buildNewsStrip(news, fetchStatus = { ok: true, error: null }) {
+  if (!news.length) {
+    if (!fetchStatus.error) return '';
+    return `
+      <div style="
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--warning);
+        border-radius: var(--radius-lg);
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        display:flex;align-items:center;gap:10px
+      ">
+        <span style="font-size:16px">⚠️</span>
+        <span style="font-size:13px;color:var(--warning)">Could not load economic events: ${fetchStatus.error}</span>
+      </div>`;
+  }
 
   const impactColor = { High: '#ff4757', Medium: '#ffa502' };
   const impactBg    = { High: 'rgba(255,71,87,0.1)', Medium: 'rgba(255,165,2,0.1)' };
