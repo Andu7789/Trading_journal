@@ -2,15 +2,18 @@
 //  NEWS CALENDAR — ForexFactory feed
 // =============================================
 
-const CACHE_KEY     = 'tj_news_cache_v7';
+const CACHE_KEY     = 'tj_news_cache_v8';
 const CACHE_TTL_MS  = 60 * 60 * 1000; // 1 hour
 
 const FF_BASE  = 'https://nfs.faireconomy.media';
-const PROXY    = 'https://corsproxy.io/?';
-const FEEDS = [
-  `${PROXY}${encodeURIComponent(FF_BASE + '/ff_calendar_lastweek.json')}`,
-  `${PROXY}${encodeURIComponent(FF_BASE + '/ff_calendar_thisweek.json')}`,
-  `${PROXY}${encodeURIComponent(FF_BASE + '/ff_calendar_nextweek.json')}`,
+const PROXIES  = [
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+];
+const FEED_PATHS = [
+  '/ff_calendar_lastweek.json',
+  '/ff_calendar_thisweek.json',
+  '/ff_calendar_nextweek.json',
 ];
 
 // Currencies we care about (matches user's pairs + USD as driver)
@@ -64,6 +67,23 @@ export async function getNewsForRange(startDate, endDate) {
 
 // ---- Internal ----
 
+async function fetchFeedPath(path) {
+  const target = FF_BASE + path;
+  for (const proxy of PROXIES) {
+    try {
+      const r    = await fetch(proxy + encodeURIComponent(target));
+      const text = await r.text();
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        console.log(`[News] ${path} OK via ${proxy.includes('allorigins') ? 'allorigins' : 'corsproxy'} (${parsed.length} events)`);
+        return parsed;
+      }
+    } catch {}
+  }
+  console.warn('[News] All proxies failed for', path);
+  return [];
+}
+
 async function fetchAll() {
   // Return from cache if fresh
   try {
@@ -74,22 +94,9 @@ async function fetchAll() {
     }
   } catch {}
 
-  // Fetch both weeks in parallel
+  // Fetch all feed paths in parallel, each with proxy fallback
   try {
-    const results = await Promise.allSettled(
-      FEEDS.map(url =>
-        fetch(url).then(async r => {
-          const text = await r.text();
-          try {
-            const parsed = JSON.parse(text);
-            return Array.isArray(parsed) ? parsed : [];
-          } catch {
-            console.warn('[News] Non-JSON response from proxy:', text.slice(0, 200));
-            return [];
-          }
-        })
-      )
-    );
+    const results = await Promise.allSettled(FEED_PATHS.map(fetchFeedPath));
 
     const data = results
       .filter(r => r.status === 'fulfilled')
