@@ -742,9 +742,15 @@ function buildSetupRow(s) {
 
   const screenshots = s.screenshots || [];
   const screenshotCell = screenshots.length
-    ? `<div class="screenshots-grid" style="gap:4px">${screenshots.map(url =>
-        `<img src="${url}" style="width:40px;height:30px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="window._viewPreview(this)" alt="screenshot">`
-      ).join('')}</div>`
+    ? `<div data-ss-section>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span class="text-xs text-muted">Screenshots (${screenshots.length})</span>
+          ${screenshots.length > 1 ? `<button class="btn btn-ghost btn-xs" onclick="window._openGalleryFromSection(this)">View All</button>` : ''}
+        </div>
+        <div class="screenshots-grid">
+          ${screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">`).join('')}
+        </div>
+      </div>`
     : '—';
 
   const notesText = s.notes ? s.notes.slice(0, 60) + (s.notes.length > 60 ? '...' : '') : '—';
@@ -1063,7 +1069,7 @@ function addSetupFiles(files) {
       item.className = 'preview-item';
       item.dataset.idx = idx;
       item.innerHTML = `
-        <img src="${url}" alt="screenshot" onclick="window._viewImage('${url}')">
+        <img src="${url}" alt="screenshot" onclick="window._viewPreview(this)">
         <button class="preview-remove" onclick="window._stRemovePreview(${idx})">×</button>
       `;
       previews.appendChild(item);
