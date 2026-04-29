@@ -492,6 +492,7 @@ export function openTradeModal(id = null, date = null, callback = null) {
   });
 
   modal.classList.remove('hidden');
+  document.querySelector('#trade-modal .modal-body')?.scrollTo(0, 0);
 }
 
 async function loadTradeIntoModal(id) {
