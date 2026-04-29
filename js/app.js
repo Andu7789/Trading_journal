@@ -543,7 +543,7 @@ async function loadTradeIntoModal(id) {
         item.className = 'preview-item';
         item.dataset.idx = idx;
         item.innerHTML = `
-          <img src="${url}" alt="screenshot" onclick="window._viewImage('${url}')">
+          <img src="${url}" alt="screenshot" onclick="window._viewPreview(this)">
           <button class="preview-remove" onclick="removePreview(${idx})">×</button>
         `;
         if (previews) previews.appendChild(item);
@@ -663,10 +663,13 @@ function setupImageModal() {
   if (prevBtn)  prevBtn.onclick  = () => _galleryStep(-1);
   if (nextBtn)  nextBtn.onclick  = () => _galleryStep(1);
 
+  const gridClose = document.getElementById('close-gallery-grid');
+  if (gridClose) gridClose.onclick = closeGalleryGrid;
+
   document.addEventListener('keydown', (e) => {
     const modal = document.getElementById('image-modal');
     const open  = modal && !modal.classList.contains('hidden');
-    if (e.key === 'Escape') { closeTradeModal(); closeImageModal(); }
+    if (e.key === 'Escape') { closeTradeModal(); closeImageModal(); closeGalleryGrid(); }
     if (open && e.key === 'ArrowLeft')  { e.preventDefault(); _galleryStep(-1); }
     if (open && e.key === 'ArrowRight') { e.preventDefault(); _galleryStep(1); }
   });
@@ -727,6 +730,54 @@ window._viewPreview = function(imgEl) {
   }
   if (_galleryIdx < 0) _galleryIdx = 0;
   _showImageAt(_galleryIdx);
+};
+
+// =============================================
+//  FULLSCREEN GALLERY GRID
+// =============================================
+let _gridGalleryUrls = [];
+
+function _openGalleryGrid(urls) {
+  if (!urls.length) return;
+  const modal = document.getElementById('gallery-grid-modal');
+  const body  = document.getElementById('gallery-grid-body');
+  if (!modal || !body) return;
+
+  const n    = urls.length;
+  const cols = n === 1 ? 1 : n <= 2 ? 2 : n === 3 ? 3 : 2;
+  const rows = Math.ceil(n / cols);
+
+  body.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  body.style.gridTemplateRows    = `repeat(${rows}, 1fr)`;
+  body.innerHTML = urls.map((url, i) => `
+    <div style="overflow:hidden;cursor:zoom-in;border-radius:6px;background:#111;display:flex;align-items:center;justify-content:center"
+         onclick="window._galleryGridClick(${i})">
+      <img src="${url}" alt="screenshot ${i + 1}"
+           style="width:100%;height:100%;object-fit:contain;display:block;transition:transform 0.15s">
+    </div>
+  `).join('');
+
+  _gridGalleryUrls = urls;
+  modal.style.display = 'flex';
+}
+
+function closeGalleryGrid() {
+  const modal = document.getElementById('gallery-grid-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+window._galleryGridClick = function(idx) {
+  closeGalleryGrid();
+  _gallery    = _gridGalleryUrls;
+  _galleryIdx = idx;
+  _showImageAt(_galleryIdx);
+};
+
+window._openGalleryFromSection = function(btn) {
+  const section = btn.closest('[data-ss-section]');
+  if (!section) return;
+  const urls = Array.from(section.querySelectorAll('.screenshots-grid img')).map(i => i.src);
+  _openGalleryGrid(urls);
 };
 
 // =============================================

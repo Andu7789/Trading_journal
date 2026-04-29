@@ -381,6 +381,16 @@
       </div>
     </div>
 
+    <!-- ===== GALLERY GRID MODAL ===== -->
+    <div id="gallery-grid-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.97);flex-direction:column;padding:12px 16px">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;flex-shrink:0">
+        <button id="close-gallery-grid" style="background:rgba(255,255,255,0.12);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="gallery-grid-body" style="display:grid;gap:8px;flex:1;overflow:hidden;min-height:0"></div>
+    </div>
+
     <!-- ===== STRATEGY SETUP MODAL ===== -->
     <div id="st-modal" class="modal hidden">
       <div class="modal-backdrop" id="st-modal-backdrop"></div>

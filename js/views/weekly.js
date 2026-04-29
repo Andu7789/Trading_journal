@@ -232,8 +232,16 @@ function buildScreenshots(trades) {
   const allScreenshots = trades.flatMap(t => t.screenshots || []);
   if (!allScreenshots.length) return '';
   return `
-    <div class="screenshots-grid" style="margin-bottom:16px">
-      ${allScreenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">`).join('')}
+    <div data-ss-section style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.5px">
+          Screenshots (${allScreenshots.length})
+        </span>
+        ${allScreenshots.length > 1 ? `<button class="btn btn-ghost btn-xs" onclick="window._openGalleryFromSection(this)">View All</button>` : ''}
+      </div>
+      <div class="screenshots-grid">
+        ${allScreenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">`).join('')}
+      </div>
     </div>
   `;
 }
