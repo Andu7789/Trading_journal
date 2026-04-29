@@ -23,7 +23,10 @@ let tradeCallback  = null;
 let pendingScreenshots = []; // { file, url } for new uploads; or { url } for existing
 
 function updateTradeSignalScore() {
-  const count = document.querySelectorAll('#trade-form .signal-toggle.active').length;
+  const btns  = document.querySelectorAll('#trade-form .signal-toggle[data-signal]');
+  const count = Array.from(btns).filter(b => b.classList.contains('active')).length;
+  const allBtn = document.getElementById('trade-signal-all');
+  if (allBtn) allBtn.classList.toggle('active', count === btns.length);
   const el = document.getElementById('trade-signal-score');
   if (el) el.textContent = `Score: ${count} / 4`;
 }
@@ -321,11 +324,19 @@ function setupTradeModal() {
   });
 
   // Signal confluence toggles
-  document.querySelectorAll('#trade-form .signal-toggle').forEach(btn => {
+  document.querySelectorAll('#trade-form .signal-toggle[data-signal]').forEach(btn => {
     btn.onclick = () => {
       btn.classList.toggle('active');
       updateTradeSignalScore();
     };
+  });
+
+  // All toggle
+  document.getElementById('trade-signal-all')?.addEventListener('click', () => {
+    const btns = document.querySelectorAll('#trade-form .signal-toggle[data-signal]');
+    const allActive = Array.from(btns).every(b => b.classList.contains('active'));
+    btns.forEach(b => b.classList.toggle('active', !allActive));
+    updateTradeSignalScore();
   });
 
   // Tilt meter label
@@ -459,7 +470,7 @@ export function openTradeModal(id = null, date = null, callback = null) {
   if (prompt)   prompt.style.display = '';
 
   // Reset signal toggles
-  document.querySelectorAll('#trade-form .signal-toggle').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#trade-form .signal-toggle[data-signal]').forEach(b => b.classList.remove('active'));
   updateTradeSignalScore();
 
   // Reset trade type to "taken"
@@ -543,9 +554,9 @@ async function loadTradeIntoModal(id) {
     }
 
     // Signal confluence
-    document.querySelectorAll('#trade-form .signal-toggle').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#trade-form .signal-toggle[data-signal]').forEach(b => b.classList.remove('active'));
     if (Array.isArray(trade.signals)) {
-      document.querySelectorAll('#trade-form .signal-toggle').forEach(btn => {
+      document.querySelectorAll('#trade-form .signal-toggle[data-signal]').forEach(btn => {
         if (trade.signals.includes(btn.dataset.signal)) btn.classList.add('active');
       });
     }
@@ -656,7 +667,7 @@ async function handleSaveTrade() {
       notes:         document.getElementById('trade-notes').value.trim() || null,
       mistakes:      document.getElementById('trade-mistakes').value.trim() || null,
       screenshots:   screenshotUrls,
-      signals:       Array.from(document.querySelectorAll('#trade-form .signal-toggle.active')).map(b => b.dataset.signal),
+      signals:       Array.from(document.querySelectorAll('#trade-form .signal-toggle[data-signal].active')).map(b => b.dataset.signal),
     };
 
     if (!tradeData.id) delete tradeData.id;

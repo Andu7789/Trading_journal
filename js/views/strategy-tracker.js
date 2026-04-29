@@ -13,7 +13,10 @@ let pendingSetupScreenshots = [];  // { file, localUrl, uploaded, url? }
 const DEFAULT_PAIRS = ['EURUSD', 'GBPUSD'];
 
 function _updateStSignalScore() {
-  const count = document.querySelectorAll('.st-signal-toggle.active').length;
+  const btns  = document.querySelectorAll('.st-signal-toggle');
+  const count = Array.from(btns).filter(b => b.classList.contains('active')).length;
+  const allBtn = document.getElementById('st-signal-all');
+  if (allBtn) allBtn.classList.toggle('active', count === btns.length);
   const el = document.getElementById('st-signal-score');
   if (el) el.textContent = `Score: ${count} / 4`;
 }
@@ -807,6 +810,13 @@ function ensureModalsInDom() {
   document.getElementById('st-modal-close').onclick     = closeSetupModal;
   document.getElementById('st-modal-cancel').onclick    = closeSetupModal;
   document.getElementById('st-modal-save').onclick      = handleSaveSetup;
+
+  document.getElementById('st-signal-all')?.addEventListener('click', () => {
+    const btns = document.querySelectorAll('.st-signal-toggle');
+    const allActive = Array.from(btns).every(b => b.classList.contains('active'));
+    btns.forEach(b => b.classList.toggle('active', !allActive));
+    _updateStSignalScore();
+  });
 
   document.getElementById('st-pair-modal-backdrop').onclick = closePairModal;
   document.getElementById('st-pair-modal-close').onclick    = closePairModal;
