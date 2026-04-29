@@ -80,6 +80,7 @@ function buildShell() {
 
     <!-- Confluence Analysis -->
     <div id="st-confluence-section" style="margin-bottom:20px"></div>
+    <div id="st-confluence-drilldown" style="display:none;margin-bottom:20px"></div>
 
     <!-- Week nav -->
     <div class="week-nav" style="margin-bottom:16px">
@@ -457,6 +458,7 @@ function _drawPairChart(setups) {
 // =============================================
 const ST_SIGNALS     = ['Dollar', 'DXY', 'EURUSD', 'GBPUSD'];
 const ST_SIG_LABELS  = { Dollar: 'Dollar', DXY: 'DXY', EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD' };
+let _stConfByScore   = { 0: [], 1: [], 2: [], 3: [], 4: [] };
 
 function renderStConfluence(allSetups) {
   const el = document.getElementById('st-confluence-section');
@@ -474,11 +476,12 @@ function renderStConfluence(allSetups) {
     </div>
   `;
 
-  const byScore = { 0: [], 1: [], 2: [], 3: [], 4: [] };
+  _stConfByScore = { 0: [], 1: [], 2: [], 3: [], 4: [] };
   closed.forEach(s => {
     const score = Array.isArray(s.signals) ? s.signals.length : 0;
-    if (score in byScore) byScore[score].push(s);
+    if (score in _stConfByScore) _stConfByScore[score].push(s);
   });
+  const byScore = _stConfByScore;
 
   const labels    = ['0 / 4', '1 / 4', '2 / 4', '3 / 4', '4 / 4'];
   const rValues   = [0,1,2,3,4].map(sc => _calcR(byScore[sc]));
@@ -498,6 +501,11 @@ function renderStConfluence(allSetups) {
       ]
     },
     options: {
+      onClick: (e, elements) => {
+        if (!elements.length) return;
+        showStConfluenceDrilldown(elements[0].index);
+      },
+      onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: true, labels: { color: '#94a3b8', font: { size: 11 } } },
@@ -568,6 +576,64 @@ function renderStConfluence(allSetups) {
       </div>
     `;
   }
+}
+
+function showStConfluenceDrilldown(scoreIdx) {
+  const panel = document.getElementById('st-confluence-drilldown');
+  if (!panel) return;
+
+  const setups = _stConfByScore[scoreIdx] || [];
+  if (!setups.length) { panel.style.display = 'none'; return; }
+
+  const scoreColor = scoreIdx === 4 ? '#00e676' : scoreIdx === 3 ? '#4cd964' : scoreIdx === 2 ? '#ffa502' : scoreIdx === 1 ? '#ff8c00' : 'var(--text-muted)';
+  const totalR = _calcR(setups);
+  const wins   = setups.filter(s => s.outcome === 'win').length;
+
+  panel.style.display = '';
+  panel.innerHTML = `
+    <div class="card">
+      <div class="card-header" style="margin-bottom:16px">
+        <div>
+          <div class="card-title">
+            Score <span style="color:${scoreColor};font-weight:800">${scoreIdx}/4</span> — ${setups.length} setup${setups.length !== 1 ? 's' : ''}
+          </div>
+          <div class="card-subtitle">
+            ${(wins/setups.length*100).toFixed(0)}% win rate ·
+            ${totalR >= 0 ? '+' : ''}${totalR}R total ·
+            ${setups.filter(s=>s.outcome==='loss').length} losses
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('st-confluence-drilldown').style.display='none'">✕ Close</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Pair</th><th>Dir</th><th>Possible R</th>
+              <th>Outcome</th><th>Conf.</th><th>Notes</th><th>Screenshots</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${setups.map(s => buildSetupRow(s)).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Wire edit/delete buttons in the drilldown
+  panel.querySelectorAll('.st-edit-btn').forEach(btn => {
+    btn.onclick = () => {
+      const setup = setups.find(s => s.id === btn.dataset.id);
+      if (setup) openSetupModal(setup);
+    };
+  });
+  panel.querySelectorAll('.st-delete-btn').forEach(btn => {
+    btn.onclick = () => confirmDeleteSetup(btn.dataset.id);
+  });
+
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // =============================================
