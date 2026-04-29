@@ -78,6 +78,9 @@ function buildShell() {
     <!-- Breakdown charts -->
     <div id="st-breakdown-charts" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px"></div>
 
+    <!-- Confluence Analysis -->
+    <div id="st-confluence-section" style="margin-bottom:20px"></div>
+
     <!-- Week nav -->
     <div class="week-nav" style="margin-bottom:16px">
       <button class="btn btn-ghost btn-sm" id="st-week-prev">‹ Prev Week</button>
@@ -134,6 +137,7 @@ async function loadAllTimeAndChart() {
     if (statsEl) statsEl.innerHTML = buildAllTimeStats(stats);
     renderChartSection(allSetups);
     renderBreakdownCharts(allSetups);
+    renderStConfluence(allSetups);
   } catch (err) {
     if (statsEl) statsEl.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
     if (chartEl) chartEl.innerHTML = `<p class="text-loss text-sm" style="padding:20px">${err.message}</p>`;
@@ -446,6 +450,124 @@ function _drawPairChart(setups) {
 
   const pairs = Object.keys(byPair).sort((a, b) => _calcR(byPair[b]) - _calcR(byPair[a]));
   _barChart('st-pair-chart', pairs, pairs.map(p => _calcR(byPair[p])), pairs.map(p => _winRate(byPair[p])));
+}
+
+// =============================================
+//  CONFLUENCE ANALYSIS
+// =============================================
+const ST_SIGNALS     = ['Dollar', 'DXY', 'EURUSD', 'GBPUSD'];
+const ST_SIG_LABELS  = { Dollar: 'Dollar', DXY: 'DXY', EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD' };
+
+function renderStConfluence(allSetups) {
+  const el = document.getElementById('st-confluence-section');
+  if (!el) return;
+
+  const closed = allSetups.filter(s => s.outcome === 'win' || s.outcome === 'loss' || s.outcome === 'breakeven');
+  if (!closed.length) { el.innerHTML = ''; return; }
+
+  el.innerHTML = `
+    <div class="card" style="padding:20px">
+      <div class="card-title" style="font-size:14px;margin-bottom:4px">Signal Confluence Analysis</div>
+      <div class="card-subtitle" style="margin-bottom:16px">Setup performance by number of confirmed swing-point signals (0–4)</div>
+      <div style="position:relative;height:220px"><canvas id="st-confluence-chart"></canvas></div>
+      <div id="st-confluence-table" style="margin-top:20px"></div>
+    </div>
+  `;
+
+  const byScore = { 0: [], 1: [], 2: [], 3: [], 4: [] };
+  closed.forEach(s => {
+    const score = Array.isArray(s.signals) ? s.signals.length : 0;
+    if (score in byScore) byScore[score].push(s);
+  });
+
+  const labels    = ['0 / 4', '1 / 4', '2 / 4', '3 / 4', '4 / 4'];
+  const rValues   = [0,1,2,3,4].map(sc => _calcR(byScore[sc]));
+  const winRates  = [0,1,2,3,4].map(sc => byScore[sc].length ? _winRate(byScore[sc]) : null);
+  const barColors = ['rgba(255,71,87,0.6)','rgba(255,140,0,0.6)','rgba(255,165,2,0.6)','rgba(76,217,100,0.6)','rgba(0,230,118,0.7)'];
+
+  const canvas = document.getElementById('st-confluence-chart');
+  if (canvas._chart) canvas._chart.destroy();
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Total R', data: rValues, backgroundColor: rValues.map((v, i) => barColors[i]), borderWidth: 0, yAxisID: 'y' },
+        { label: 'Win Rate %', data: winRates, type: 'line', borderColor: '#3d7ef0', borderWidth: 2,
+          pointRadius: 5, pointBackgroundColor: '#3d7ef0', yAxisID: 'y2', tension: 0, spanGaps: true }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels: { color: '#94a3b8', font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Win Rate %' ? `${ctx.parsed.y}%` : `${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}R` } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+        y:  { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => `${v}R` }, position: 'left' },
+        y2: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => `${v}%` }, position: 'right', min: 0, max: 100 }
+      }
+    }
+  });
+
+  const instStats = ST_SIGNALS.map(inst => {
+    const withInst    = closed.filter(s => Array.isArray(s.signals) && s.signals.includes(inst));
+    const withoutInst = closed.filter(s => !Array.isArray(s.signals) || !s.signals.includes(inst));
+    const wrWith    = withInst.length    ? _winRate(withInst).toFixed(0)    : '—';
+    const wrWithout = withoutInst.length ? _winRate(withoutInst).toFixed(0) : '—';
+    const rWith     = withInst.length    ? _calcR(withInst)                 : '—';
+    return { label: ST_SIG_LABELS[inst], count: withInst.length, wrWith, wrWithout, rWith };
+  });
+
+  const tableEl = document.getElementById('st-confluence-table');
+  if (tableEl) {
+    tableEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          <div class="text-xs text-muted" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">By Score</div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              ${['Score','Setups','Win %','Avg R','Total R'].map(h => `<th style="text-align:left;padding:4px 8px;font-size:11px;color:var(--text-muted)">${h}</th>`).join('')}
+            </tr></thead>
+            <tbody>
+              ${[0,1,2,3,4].filter(sc => byScore[sc].length).map(sc => {
+                const ts  = byScore[sc];
+                const wins = ts.filter(s => s.outcome === 'win').length;
+                const totalR = _calcR(ts);
+                const avgR   = ts.length ? parseFloat((totalR / ts.length).toFixed(2)) : 0;
+                const scoreColor = sc === 4 ? '#00e676' : sc === 3 ? '#4cd964' : sc === 2 ? '#ffa502' : sc === 1 ? '#ff8c00' : 'var(--text-muted)';
+                return `<tr>
+                  <td style="padding:4px 8px"><span style="font-weight:700;color:${scoreColor};font-size:12px">${sc}/4</span></td>
+                  <td style="padding:4px 8px;font-size:12px">${ts.length}</td>
+                  <td style="padding:4px 8px;font-size:12px;color:var(--profit)">${(wins/ts.length*100).toFixed(0)}%</td>
+                  <td style="padding:4px 8px;font-size:12px;color:${avgR >= 0 ? 'var(--profit)' : 'var(--loss)'}">${avgR >= 0 ? '+' : ''}${avgR}R</td>
+                  <td style="padding:4px 8px;font-size:12px;color:${totalR >= 0 ? 'var(--profit)' : 'var(--loss)'}">${totalR >= 0 ? '+' : ''}${totalR}R</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div class="text-xs text-muted" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Per Instrument</div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              ${['Instrument','Setups','WR with','WR without','R with'].map(h => `<th style="text-align:left;padding:4px 8px;font-size:11px;color:var(--text-muted)">${h}</th>`).join('')}
+            </tr></thead>
+            <tbody>
+              ${instStats.map(r => `<tr>
+                <td style="padding:4px 8px;font-size:12px;font-weight:600">${r.label}</td>
+                <td style="padding:4px 8px;font-size:12px;color:var(--text-muted)">${r.count}</td>
+                <td style="padding:4px 8px;font-size:12px;color:var(--profit)">${r.wrWith}${r.wrWith !== '—' ? '%' : ''}</td>
+                <td style="padding:4px 8px;font-size:12px;color:var(--text-muted)">${r.wrWithout}${r.wrWithout !== '—' ? '%' : ''}</td>
+                <td style="padding:4px 8px;font-size:12px;color:${r.rWith !== '—' && r.rWith >= 0 ? 'var(--profit)' : 'var(--loss)'}">${r.rWith !== '—' ? (r.rWith >= 0 ? '+' : '') + r.rWith + 'R' : '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
 }
 
 // =============================================
