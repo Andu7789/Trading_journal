@@ -4,7 +4,7 @@
 import { getTrades, getJournalEntries } from '../db.js';
 import { calcStats, formatCurrency, formatDate, formatDateShort,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
-         todayString, getWeekRange, addDays, nl2br } from '../utils.js';
+         todayString, getWeekRange, addDays, nl2br, getSignalDisplay } from '../utils.js';
 import { openTradeModal } from '../app.js';
 
 let currentWeekStart = null;
@@ -205,7 +205,7 @@ function buildWeekTradeTable(trades) {
     <div class="table-wrapper" style="margin-bottom:16px">
       <table>
         <thead>
-          <tr><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>R:R</th><th>Outcome</th><th>Strategy</th><th>Notes</th></tr>
+          <tr><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>R:R</th><th>Outcome</th><th>Strategy</th><th>Conf.</th><th>Notes</th></tr>
         </thead>
         <tbody>
           ${trades.map(t => `
@@ -218,6 +218,7 @@ function buildWeekTradeTable(trades) {
               <td class="td-mono">${t.risk_reward ? t.risk_reward + 'R' : '—'}</td>
               <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
               <td class="text-sm text-muted">${t.strategy || '—'}</td>
+              <td>${getSignalDisplay(t.signals)}</td>
               <td class="text-sm text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${t.notes ? t.notes.slice(0,60) + (t.notes.length > 60 ? '...' : '') : '—'}</td>
             </tr>
           `).join('')}

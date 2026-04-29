@@ -22,6 +22,12 @@ let currentView    = null;
 let tradeCallback  = null;
 let pendingScreenshots = []; // { file, url } for new uploads; or { url } for existing
 
+function updateTradeSignalScore() {
+  const count = document.querySelectorAll('#trade-form .signal-toggle.active').length;
+  const el = document.getElementById('trade-signal-score');
+  if (el) el.textContent = `Score: ${count} / 4`;
+}
+
 // ---- Image carousel state ----
 let _gallery    = [];
 let _galleryIdx = 0;
@@ -314,6 +320,14 @@ function setupTradeModal() {
     };
   });
 
+  // Signal confluence toggles
+  document.querySelectorAll('#trade-form .signal-toggle').forEach(btn => {
+    btn.onclick = () => {
+      btn.classList.toggle('active');
+      updateTradeSignalScore();
+    };
+  });
+
   // Tilt meter label
   const tiltSlider = document.getElementById('trade-tilt');
   const tiltValEl  = document.getElementById('tilt-value');
@@ -414,6 +428,7 @@ function addFiles(files) {
         <button class="preview-remove" onclick="removePreview(${idx})">×</button>
       `;
       previews.appendChild(item);
+      updateTradeModalViewAll();
     };
     reader.readAsDataURL(file);
   });
@@ -423,6 +438,7 @@ window.removePreview = function(idx) {
   pendingScreenshots[idx] = null;
   const item = document.querySelector(`.preview-item[data-idx="${idx}"]`);
   if (item) item.remove();
+  updateTradeModalViewAll();
 };
 
 export function openTradeModal(id = null, date = null, callback = null) {
@@ -442,6 +458,10 @@ export function openTradeModal(id = null, date = null, callback = null) {
   document.getElementById('trade-rr').value = '';
   if (previews) previews.innerHTML = '';
   if (prompt)   prompt.style.display = '';
+
+  // Reset signal toggles
+  document.querySelectorAll('#trade-form .signal-toggle').forEach(b => b.classList.remove('active'));
+  updateTradeSignalScore();
 
   // Reset trade type to "taken"
   document.querySelectorAll('.trade-type-btn').forEach(b => b.classList.remove('active'));
@@ -522,6 +542,15 @@ async function loadTradeIntoModal(id) {
       if (radio) radio.checked = true;
     }
 
+    // Signal confluence
+    document.querySelectorAll('#trade-form .signal-toggle').forEach(b => b.classList.remove('active'));
+    if (Array.isArray(trade.signals)) {
+      document.querySelectorAll('#trade-form .signal-toggle').forEach(btn => {
+        if (trade.signals.includes(btn.dataset.signal)) btn.classList.add('active');
+      });
+    }
+    updateTradeSignalScore();
+
     // Tilt
     if (trade.tilt_meter) {
       const slider = document.getElementById('trade-tilt');
@@ -548,6 +577,7 @@ async function loadTradeIntoModal(id) {
         `;
         if (previews) previews.appendChild(item);
       });
+      updateTradeModalViewAll();
     }
   } catch (err) {
     showToast('Failed to load trade: ' + err.message, 'error');
@@ -619,6 +649,7 @@ async function handleSaveTrade() {
       notes:         document.getElementById('trade-notes').value.trim() || null,
       mistakes:      document.getElementById('trade-mistakes').value.trim() || null,
       screenshots:   screenshotUrls,
+      signals:       Array.from(document.querySelectorAll('#trade-form .signal-toggle.active')).map(b => b.dataset.signal),
     };
 
     if (!tradeData.id) delete tradeData.id;
@@ -771,6 +802,17 @@ window._galleryGridClick = function(idx) {
   _gallery    = _gridGalleryUrls;
   _galleryIdx = idx;
   _showImageAt(_galleryIdx);
+};
+
+function updateTradeModalViewAll() {
+  const count = document.querySelectorAll('#screenshot-previews .preview-item img').length;
+  const btn   = document.getElementById('trade-modal-view-all');
+  if (btn) btn.style.display = count > 1 ? '' : 'none';
+}
+
+window._openTradeModalGallery = function() {
+  const urls = Array.from(document.querySelectorAll('#screenshot-previews .preview-item img')).map(i => i.src);
+  _openGalleryGrid(urls);
 };
 
 window._openGalleryFromSection = function(btn) {

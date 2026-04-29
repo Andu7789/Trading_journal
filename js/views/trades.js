@@ -4,7 +4,7 @@
 import { getTrades, deleteTrade, getClient } from '../db.js';
 import { calcStats, formatCurrency, formatDate, pnlClass, pnlSign,
          getOutcomeBadge, getDirectionBadge, getEmotionChip,
-         todayString, getWeekRange, addDays, nl2br } from '../utils.js';
+         todayString, getWeekRange, addDays, nl2br, getSignalDisplay, SIGNAL_LABELS } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
 
 let currentFilters = {};
@@ -230,6 +230,7 @@ async function loadTrades() {
               <th>Outcome</th>
               <th>Strategy</th>
               <th>TF</th>
+              <th>Conf.</th>
               <th>Tilt</th>
               <th>Emotion</th>
               <th>Actions</th>
@@ -274,7 +275,8 @@ async function loadTrades() {
 }
 
 function buildTradeRow(t) {
-  const hasDetails = t.notes || t.mistakes || (t.screenshots && t.screenshots.length) || t.tags?.length;
+  const hasDetails = t.notes || t.mistakes || (t.screenshots && t.screenshots.length) || t.tags?.length || t.signals?.length;
+  const signals = Array.isArray(t.signals) ? t.signals : [];
 
   return `
     <tr class="trade-row-main" data-id="${t.id}" style="cursor:pointer" title="Click to expand notes">
@@ -291,6 +293,7 @@ function buildTradeRow(t) {
       <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
       <td class="text-sm text-muted">${t.strategy || '—'}</td>
       <td class="text-sm text-muted">${t.timeframe || '—'}</td>
+      <td>${getSignalDisplay(signals)}</td>
       <td class="td-mono text-sm">${t.tilt_meter ? t.tilt_meter + '/10' : '—'}</td>
       <td>${getEmotionChip(t.emotion)}</td>
       <td>
@@ -302,7 +305,20 @@ function buildTradeRow(t) {
     </tr>
     ${hasDetails ? `
     <tr id="detail-${t.id}" class="hidden">
-      <td colspan="16" style="background:var(--bg-surface);padding:16px 20px">
+      <td colspan="17" style="background:var(--bg-surface);padding:16px 20px">
+        ${signals.length ? `
+          <div style="margin-bottom:12px">
+            <div class="text-xs text-muted mb-8">Signal Confluence (${signals.length}/4)</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${['Dollar','DXY','EURUSD','GBPUSD'].map(inst => `
+                <span style="padding:4px 10px;border-radius:var(--radius);font-size:11px;font-weight:600;
+                  background:${signals.includes(inst) ? 'rgba(0,217,126,0.15)' : 'var(--bg-elevated)'};
+                  color:${signals.includes(inst) ? 'var(--profit)' : 'var(--text-muted)'};
+                  border:1px solid ${signals.includes(inst) ? 'var(--profit)' : 'var(--border)'}">
+                  ${SIGNAL_LABELS[inst]}
+                </span>`).join('')}
+            </div>
+          </div>` : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           ${t.trade_type === 'missed' && t.missed_reason ? `
             <div>
@@ -328,8 +344,11 @@ function buildTradeRow(t) {
           </div>
         ` : ''}
         ${t.screenshots?.length ? `
-          <div class="mt-8">
-            <div class="text-xs text-muted mb-8">Screenshots</div>
+          <div data-ss-section class="mt-8">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span class="text-xs text-muted">Screenshots (${t.screenshots.length})</span>
+              ${t.screenshots.length > 1 ? `<button class="btn btn-ghost btn-xs" onclick="window._openGalleryFromSection(this)">View All</button>` : ''}
+            </div>
             <div class="screenshots-grid">
               ${t.screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">`).join('')}
             </div>

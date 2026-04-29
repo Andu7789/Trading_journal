@@ -176,6 +176,20 @@ export function getDirectionBadge(dir) {
   return '—';
 }
 
+export const SIGNAL_INSTRUMENTS = ['Dollar', 'DXY', 'EURUSD', 'GBPUSD'];
+export const SIGNAL_LABELS      = { Dollar: 'Dollar', DXY: 'DXY', EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD' };
+
+export function getSignalDisplay(signals) {
+  const arr   = Array.isArray(signals) ? signals : [];
+  const score = arr.length;
+  const color = score === 4 ? '#00e676' : score === 3 ? '#4cd964' : score === 2 ? '#ffa502' : score === 1 ? '#ff8c00' : 'var(--text-muted)';
+  const dots  = SIGNAL_INSTRUMENTS.map(inst =>
+    `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${arr.includes(inst) ? color : 'rgba(255,255,255,0.1)'}" title="${SIGNAL_LABELS[inst]}"></span>`
+  ).join('');
+  const title = arr.length ? arr.map(s => SIGNAL_LABELS[s] || s).join(', ') : 'No signals';
+  return `<div style="display:flex;align-items:center;gap:3px" title="${title}">${dots}<span style="font-size:11px;font-weight:700;color:${color};margin-left:5px">${score}/4</span></div>`;
+}
+
 export function getEmotionChip(emotion) {
   if (!emotion) return '';
   const labels = {

@@ -3,7 +3,7 @@
 // =============================================
 import { getStrategySetups, saveStrategySetup, deleteStrategySetup, uploadScreenshot } from '../db.js';
 import { todayString, getWeekRange, addDays, formatDate, formatDateShort,
-         escapeHtml, nl2br } from '../utils.js';
+         escapeHtml, nl2br, getSignalDisplay } from '../utils.js';
 import { showToast } from '../app.js';
 
 // ---- Module state ----
@@ -11,6 +11,12 @@ let currentWeekStart        = null;
 let pendingSetupScreenshots = [];  // { file, localUrl, uploaded, url? }
 
 const DEFAULT_PAIRS = ['EURUSD', 'GBPUSD'];
+
+function _updateStSignalScore() {
+  const count = document.querySelectorAll('.st-signal-toggle.active').length;
+  const el = document.getElementById('st-signal-score');
+  if (el) el.textContent = `Score: ${count} / 4`;
+}
 
 function getPairs() {
   try {
@@ -517,6 +523,7 @@ function buildSetupsTable(setups) {
               <th>Direction</th>
               <th>Possible R</th>
               <th>Outcome</th>
+              <th>Conf.</th>
               <th>Notes</th>
               <th>Screenshots</th>
               <th>Actions</th>
@@ -561,6 +568,7 @@ function buildSetupRow(s) {
       <td>${dirBadge}</td>
       <td class="td-mono">${s.possible_r != null ? s.possible_r + 'R' : '—'}</td>
       <td>${outcomeBadge}</td>
+      <td>${getSignalDisplay(s.signals)}</td>
       <td class="text-sm text-muted" style="max-width:180px">${escapeHtml(notesText)}</td>
       <td>${screenshotCell}</td>
       <td>
@@ -642,6 +650,10 @@ function openSetupModal(setup = null) {
   // Reset direction buttons
   document.querySelectorAll('.st-dir-btn').forEach(b => b.classList.remove('active'));
 
+  // Reset signal toggles
+  document.querySelectorAll('.st-signal-toggle').forEach(b => b.classList.remove('active'));
+  _updateStSignalScore();
+
   if (setup) {
     document.getElementById('st-modal-title').textContent = 'Edit Setup';
     document.getElementById('st-setup-id').value  = setup.id;
@@ -654,6 +666,14 @@ function openSetupModal(setup = null) {
 
     if (setup.direction) {
       document.querySelector(`.st-dir-btn[data-dir="${setup.direction}"]`)?.classList.add('active');
+    }
+
+    // Load signals
+    if (Array.isArray(setup.signals)) {
+      document.querySelectorAll('.st-signal-toggle').forEach(btn => {
+        if (setup.signals.includes(btn.dataset.signal)) btn.classList.add('active');
+      });
+      _updateStSignalScore();
     }
 
     // Load existing screenshots
@@ -687,6 +707,11 @@ function openSetupModal(setup = null) {
       btn.classList.add('active');
       document.getElementById('st-direction').value = btn.dataset.dir;
     };
+  });
+
+  // Re-wire signal toggles
+  document.querySelectorAll('.st-signal-toggle').forEach(btn => {
+    btn.onclick = () => { btn.classList.toggle('active'); _updateStSignalScore(); };
   });
 }
 
@@ -732,6 +757,7 @@ async function handleSaveSetup() {
       outcome:     document.getElementById('st-outcome').value || 'win',
       notes:       document.getElementById('st-notes').value.trim() || null,
       screenshots: screenshotUrls,
+      signals:     Array.from(document.querySelectorAll('.st-signal-toggle.active')).map(b => b.dataset.signal),
     };
 
     if (!setupData.id) delete setupData.id;

@@ -262,6 +262,21 @@
               </div>
             </div>
 
+            <!-- Signal Confluence -->
+            <div class="form-section">
+              <h3 class="form-section-title">Signal Confluence</h3>
+              <div class="form-group">
+                <label class="form-label">Which instruments showed a signal at a swing point?</label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button type="button" class="signal-toggle" data-signal="Dollar">Dollar</button>
+                  <button type="button" class="signal-toggle" data-signal="DXY">DXY</button>
+                  <button type="button" class="signal-toggle" data-signal="EURUSD">EUR/USD</button>
+                  <button type="button" class="signal-toggle" data-signal="GBPUSD">GBP/USD</button>
+                </div>
+                <div class="form-hint" id="trade-signal-score">Score: 0 / 4</div>
+              </div>
+            </div>
+
             <!-- Row 4: Psychology (Tilt Meter) -->
             <div class="form-section" id="section-psychology">
               <h3 class="form-section-title">Psychology</h3>
@@ -342,7 +357,10 @@
 
             <!-- Row 6: Screenshots -->
             <div class="form-section">
-              <h3 class="form-section-title">Screenshots</h3>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <h3 class="form-section-title" style="margin-bottom:0">Screenshots</h3>
+                <button type="button" id="trade-modal-view-all" class="btn btn-ghost btn-xs" style="display:none" onclick="window._openTradeModalGallery()">View All</button>
+              </div>
               <div class="screenshot-zone" id="screenshot-zone">
                 <input type="file" id="screenshot-input" multiple accept="image/*" style="display:none">
                 <div class="upload-prompt" id="upload-prompt">
@@ -426,6 +444,16 @@
               <label class="form-label">Possible R</label>
               <input type="number" id="st-possible-r" class="form-input" step="0.1" min="0" placeholder="2.5">
             </div>
+          </div>
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">Signal Confluence</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="signal-toggle st-signal-toggle" data-signal="Dollar">Dollar</button>
+              <button type="button" class="signal-toggle st-signal-toggle" data-signal="DXY">DXY</button>
+              <button type="button" class="signal-toggle st-signal-toggle" data-signal="EURUSD">EUR/USD</button>
+              <button type="button" class="signal-toggle st-signal-toggle" data-signal="GBPUSD">GBP/USD</button>
+            </div>
+            <div class="form-hint" id="st-signal-score">Score: 0 / 4</div>
           </div>
           <div class="form-group" style="margin-bottom:16px">
             <label class="form-label">Outcome</label>

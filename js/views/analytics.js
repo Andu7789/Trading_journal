@@ -4,7 +4,7 @@
 import { getTrades } from '../db.js';
 import { calcStats, formatCurrency, groupBy, sum, todayString,
          getMonthRange, pnlSign, pnlClass, formatDate,
-         getDirectionBadge, getOutcomeBadge, nl2br } from '../utils.js';
+         getDirectionBadge, getOutcomeBadge, nl2br, SIGNAL_INSTRUMENTS, SIGNAL_LABELS } from '../utils.js';
 import { openTradeModal } from '../app.js';
 
 let charts = {};
@@ -207,6 +207,20 @@ function buildAnalyticsLayout(trades) {
       <div class="card-header"><div class="card-title">Streak Analysis</div></div>
       <div id="streak-content"></div>
     </div>
+
+    <!-- Row 6: Confluence Analysis -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Signal Confluence Analysis</div>
+          <div class="card-subtitle">Trade performance by number of confirmed swing-point signals (0–4)</div>
+        </div>
+      </div>
+      <div id="confluence-content">
+        <div class="chart-wrapper" style="height:240px"><canvas id="chart-confluence"></canvas></div>
+        <div id="confluence-table" style="margin-top:16px"></div>
+      </div>
+    </div>
   `;
 }
 
@@ -222,6 +236,7 @@ function renderAllCharts(trades) {
   renderMistakes(trades);
   renderDirection(trades);
   renderStreaks(trades);
+  renderConfluence(trades);
 }
 
 function renderEquityCurve(trades) {
@@ -762,6 +777,111 @@ function renderStreaks(trades) {
       </div>
     </div>
   `;
+}
+
+function renderConfluence(trades) {
+  const canvas = document.getElementById('chart-confluence');
+  const tableEl = document.getElementById('confluence-table');
+  if (!canvas) return;
+
+  // Group by signal score (0-4)
+  const byScore = { 0: [], 1: [], 2: [], 3: [], 4: [] };
+  trades.forEach(t => {
+    const score = Array.isArray(t.signals) ? t.signals.length : 0;
+    if (score in byScore) byScore[score].push(t);
+  });
+
+  const labels    = ['0 / 4', '1 / 4', '2 / 4', '3 / 4', '4 / 4'];
+  const counts    = [0,1,2,3,4].map(s => byScore[s].length);
+  const winRates  = [0,1,2,3,4].map(s => {
+    const ts = byScore[s];
+    return ts.length ? parseFloat((ts.filter(t => t.outcome === 'win').length / ts.length * 100).toFixed(1)) : null;
+  });
+  const avgPnls   = [0,1,2,3,4].map(s => {
+    const ts = byScore[s];
+    return ts.length ? parseFloat((sum(ts, 'pnl') / ts.length).toFixed(2)) : null;
+  });
+
+  const barColors = ['rgba(255,71,87,0.6)', 'rgba(255,140,0,0.6)', 'rgba(255,165,2,0.6)', 'rgba(76,217,100,0.6)', 'rgba(0,230,118,0.7)'];
+
+  charts.confluence = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Trades', data: counts, backgroundColor: barColors, borderWidth: 0, yAxisID: 'y' },
+        { label: 'Win Rate %', data: winRates, type: 'line', borderColor: '#3d7ef0', borderWidth: 2,
+          pointRadius: 5, pointBackgroundColor: '#3d7ef0', yAxisID: 'y2', tension: 0, spanGaps: true }
+      ]
+    },
+    options: {
+      ...chartOptions({ legend: true }),
+      scales: {
+        x: xScale(),
+        y:  { ...yScale(), position: 'left',  title: { display: true, text: 'Trade Count', color: '#8da2c0', font: { size: 11 } } },
+        y2: { ...yScale(), position: 'right', grid: { display: false }, min: 0, max: 100,
+              title: { display: true, text: 'Win Rate %', color: '#3d7ef0', font: { size: 11 } } }
+      }
+    }
+  });
+
+  // Individual instrument hit rate
+  const instStats = SIGNAL_INSTRUMENTS.map(inst => {
+    const withInst   = trades.filter(t => Array.isArray(t.signals) && t.signals.includes(inst));
+    const withoutInst = trades.filter(t => !Array.isArray(t.signals) || !t.signals.includes(inst));
+    const wrWith    = withInst.length ? (withInst.filter(t => t.outcome === 'win').length / withInst.length * 100).toFixed(0) : '—';
+    const wrWithout = withoutInst.length ? (withoutInst.filter(t => t.outcome === 'win').length / withoutInst.length * 100).toFixed(0) : '—';
+    const pnlWith   = withInst.length ? formatCurrency(sum(withInst, 'pnl') / withInst.length) : '—';
+    return { label: SIGNAL_LABELS[inst], withInst: withInst.length, wrWith, wrWithout, pnlWith };
+  });
+
+  if (tableEl) {
+    tableEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div class="text-xs text-muted" style="margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Performance by Score</div>
+          <table class="table-wrapper" style="width:100%">
+            <thead><tr><th>Score</th><th>Trades</th><th>Win %</th><th>Avg P&L</th><th>Total P&L</th></tr></thead>
+            <tbody>
+              ${[0,1,2,3,4].filter(s => byScore[s].length).map(s => {
+                const ts = byScore[s]; const wins = ts.filter(t => t.outcome === 'win').length;
+                const totalPnl = sum(ts, 'pnl');
+                const scoreColor = s === 4 ? '#00e676' : s === 3 ? '#4cd964' : s === 2 ? '#ffa502' : s === 1 ? '#ff8c00' : 'var(--text-muted)';
+                return `<tr>
+                  <td><span style="font-weight:700;color:${scoreColor}">${s}/4</span></td>
+                  <td>${ts.length}</td>
+                  <td>${ts.length ? (wins/ts.length*100).toFixed(0)+'%' : '—'}</td>
+                  <td class="${parseFloat(sum(ts,'pnl')/ts.length) >= 0 ? 'text-profit' : 'text-loss'}">${formatCurrency(sum(ts,'pnl')/ts.length)}</td>
+                  <td class="${totalPnl >= 0 ? 'text-profit' : 'text-loss'}">${pnlSign(totalPnl)}${formatCurrency(totalPnl)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div class="text-xs text-muted" style="margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">Per Instrument (when present vs absent)</div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;padding:4px 8px;font-size:11px;color:var(--text-muted)">Instrument</th>
+              <th style="text-align:right;padding:4px 8px;font-size:11px;color:var(--text-muted)">Trades</th>
+              <th style="text-align:right;padding:4px 8px;font-size:11px;color:var(--text-muted)">WR with</th>
+              <th style="text-align:right;padding:4px 8px;font-size:11px;color:var(--text-muted)">WR without</th>
+              <th style="text-align:right;padding:4px 8px;font-size:11px;color:var(--text-muted)">Avg P&L</th>
+            </tr></thead>
+            <tbody>
+              ${instStats.map(r => `<tr>
+                <td style="padding:4px 8px;font-size:12px;font-weight:600">${r.label}</td>
+                <td style="padding:4px 8px;font-size:12px;text-align:right;color:var(--text-muted)">${r.withInst}</td>
+                <td style="padding:4px 8px;font-size:12px;text-align:right;color:var(--profit)">${r.wrWith}${r.wrWith !== '—' ? '%' : ''}</td>
+                <td style="padding:4px 8px;font-size:12px;text-align:right;color:var(--text-muted)">${r.wrWithout}${r.wrWithout !== '—' ? '%' : ''}</td>
+                <td style="padding:4px 8px;font-size:12px;text-align:right">${r.pnlWith}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
 }
 
 // ---- Chart helpers ----

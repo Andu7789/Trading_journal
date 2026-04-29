@@ -542,6 +542,24 @@ select.form-input option {
   color: var(--loss);
 }
 
+/* Signal Confluence Toggles */
+.signal-toggle {
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all var(--transition);
+}
+.signal-toggle.active {
+  background: rgba(0, 217, 126, 0.15);
+  border-color: var(--profit);
+  color: var(--profit);
+}
+
 /* Tilt Meter */
 .tilt-meter { display: flex; flex-direction: column; gap: 6px; }
 
