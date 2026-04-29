@@ -2,13 +2,18 @@
 //  NEWS CALENDAR — ForexFactory feed
 // =============================================
 
-const CACHE_KEY     = 'tj_news_cache_v8';
+const CACHE_KEY     = 'tj_news_cache_v9';
 const CACHE_TTL_MS  = 60 * 60 * 1000; // 1 hour
 
 const FF_BASE  = 'https://nfs.faireconomy.media';
-const PROXIES  = [
-  'https://corsproxy.io/?',
-  'https://api.allorigins.win/raw?url=',
+
+// Proxy list — tried in order until one returns valid JSON
+// Format: [urlPrefix, (rawBody) => parsed] to handle different response shapes
+const PROXIES = [
+  { prefix: 'https://corsproxy.io/?',              parse: t => JSON.parse(t) },
+  { prefix: 'https://api.allorigins.win/raw?url=', parse: t => JSON.parse(t) },
+  { prefix: 'https://api.codetabs.com/v1/proxy?quest=', parse: t => JSON.parse(t) },
+  { prefix: 'https://thingproxy.freeboard.io/fetch/', parse: t => JSON.parse(t) },
 ];
 const FEED_PATHS = [
   '/ff_calendar_lastweek.json',
@@ -73,22 +78,25 @@ export async function getNewsForRange(startDate, endDate) {
 async function fetchFeedPath(path) {
   const target = FF_BASE + path;
   const errors = [];
-  for (const proxy of PROXIES) {
+
+  for (const { prefix, parse } of PROXIES) {
+    const label = prefix.replace('https://', '').split('/')[0];
     try {
-      const r    = await fetch(proxy + encodeURIComponent(target));
+      const r    = await fetch(prefix + encodeURIComponent(target));
       const text = await r.text();
-      const parsed = JSON.parse(text);
+      const parsed = parse(text);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        console.log(`[News] ${path} OK via ${proxy.includes('allorigins') ? 'allorigins' : 'corsproxy'} (${parsed.length} events)`);
+        console.log(`[News] ${path} OK via ${label} (${parsed.length} events)`);
         return parsed;
       }
-      errors.push(`${proxy.includes('allorigins') ? 'allorigins' : 'corsproxy'}: empty response`);
+      errors.push(`${label}: empty response`);
     } catch (e) {
-      errors.push(`${proxy.includes('allorigins') ? 'allorigins' : 'corsproxy'}: ${e.message}`);
+      errors.push(`${label}: ${e.message.slice(0, 60)}`);
     }
   }
+
   console.warn('[News] All proxies failed for', path, errors);
-  throw new Error(`${path}: ${errors.join('; ')}`);
+  throw new Error(`${path.replace('/ff_calendar_','').replace('.json','')} feed unavailable (${errors[0]})`);
 }
 
 async function fetchAll() {

@@ -4,7 +4,7 @@
 import { getJournalEntry, saveJournalEntry, getTrades } from '../db.js';
 import { todayString, formatDate, addDays, calcStats, formatCurrency,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
-         tiltLabel, tiltClass, nl2br, debounce } from '../utils.js';
+         tiltLabel, tiltClass, nl2br, debounce, getSignalDisplay } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
 import { getNewsForDate, eventTime, newsFetchStatus } from '../news.js';
 
@@ -332,7 +332,7 @@ function buildTradesTable(trades, date) {
     <div class="table-wrapper">
       <table>
         <thead>
-          <tr><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>Outcome</th><th>Strategy</th><th>Tilt</th><th>Actions</th></tr>
+          <tr><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>Outcome</th><th>Strategy</th><th>Conf.</th><th>Tilt</th><th>Actions</th></tr>
         </thead>
         <tbody>
           ${trades.map(t => `
@@ -344,6 +344,7 @@ function buildTradesTable(trades, date) {
               <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
               <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
               <td class="text-muted text-sm">${t.strategy || '—'}</td>
+              <td>${getSignalDisplay(t.signals)}</td>
               <td class="td-mono">${t.tilt_meter ? `<span class="text-sm" style="color:var(--text-secondary)">${t.tilt_meter}/10</span>` : '—'}</td>
               <td>
                 <div class="trade-actions">
