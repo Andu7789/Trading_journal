@@ -170,42 +170,26 @@
               </div>
             </div>
 
-            <!-- Row 2: Prices -->
+            <!-- Row 2: Risk & P&L -->
             <div class="form-section" id="section-prices-risk">
-              <h3 class="form-section-title">Prices & Risk</h3>
+              <h3 class="form-section-title">Risk &amp; P&amp;L</h3>
               <div class="form-grid-4">
-                <div class="form-group">
-                  <label class="form-label">Entry Price</label>
-                  <input type="number" id="trade-entry" class="form-input" step="any" placeholder="0.00000">
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Exit Price</label>
-                  <input type="number" id="trade-exit" class="form-input" step="any" placeholder="0.00000">
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Stop Loss</label>
-                  <input type="number" id="trade-sl" class="form-input" step="any" placeholder="0.00000">
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Take Profit</label>
-                  <input type="number" id="trade-tp" class="form-input" step="any" placeholder="0.00000">
-                </div>
                 <div class="form-group">
                   <label class="form-label">Size / Lots</label>
                   <input type="number" id="trade-size" class="form-input" step="any" placeholder="0.01">
                 </div>
                 <div class="form-group">
-                  <label class="form-label">P&amp;L ($)</label>
+                  <label class="form-label required">P&amp;L ($)</label>
                   <input type="number" id="trade-pnl" class="form-input" step="any" placeholder="0.00">
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Risk ($)</label>
+                  <label class="form-label required">Risk ($)</label>
                   <input type="number" id="trade-risk" class="form-input" step="any" placeholder="0.00">
                 </div>
                 <div class="form-group">
-                  <label class="form-label">R:R Planned</label>
-                  <input type="number" id="trade-rr" class="form-input" step="any" placeholder="2.0" readonly>
-                  <span class="form-hint">Auto-calculated</span>
+                  <label class="form-label">R Multiple</label>
+                  <input type="number" id="trade-rr" class="form-input" step="any" placeholder="—" readonly>
+                  <span class="form-hint">P&amp;L ÷ Risk (auto)</span>
                 </div>
               </div>
             </div>

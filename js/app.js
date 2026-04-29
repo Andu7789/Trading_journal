@@ -4,7 +4,7 @@
 import { initSupabase, isConnected, testConnection, saveTrade,
          getTradeById, getDistinctSymbols, uploadScreenshot,
          getAuthSession, signInWithGoogle, signOut } from './db.js';
-import { todayString, calcRR, tiltLabel, tiltClass, formatCurrency } from './utils.js';
+import { todayString, tiltLabel, tiltClass, formatCurrency } from './utils.js';
 
 // ---- Views ----
 import { renderDashboard } from './views/dashboard.js';
@@ -338,12 +338,11 @@ function setupTradeModal() {
     };
   }
 
-  // Auto-calculate R:R
-  ['trade-entry','trade-sl','trade-tp'].forEach(id => {
+  // Auto-calculate R from P&L ÷ Risk
+  ['trade-pnl','trade-risk'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.oninput = recalcRR;
+    if (el) el.oninput = recalcR;
   });
-  document.getElementById('trade-direction')?.addEventListener('change', recalcRR);
 
   // Screenshot upload
   setupScreenshotZone();
@@ -373,15 +372,16 @@ function applyTradeTypeUI(type) {
   if (missedReasonGroup) missedReasonGroup.style.display = isMissed ? 'block' : 'none';
 }
 
-function recalcRR() {
-  const entry = document.getElementById('trade-entry')?.value;
-  const sl    = document.getElementById('trade-sl')?.value;
-  const tp    = document.getElementById('trade-tp')?.value;
-  const dir   = document.getElementById('trade-direction')?.value;
-  const rrEl  = document.getElementById('trade-rr');
+function recalcR() {
+  const pnl  = parseFloat(document.getElementById('trade-pnl')?.value);
+  const risk = parseFloat(document.getElementById('trade-risk')?.value);
+  const rrEl = document.getElementById('trade-rr');
   if (!rrEl) return;
-  const rr = calcRR(entry, sl, tp, dir);
-  rrEl.value = rr || '';
+  if (!isNaN(pnl) && !isNaN(risk) && risk > 0) {
+    rrEl.value = (pnl / risk).toFixed(2);
+  } else {
+    rrEl.value = '';
+  }
 }
 
 function setupScreenshotZone() {
@@ -455,7 +455,6 @@ export function openTradeModal(id = null, date = null, callback = null) {
   document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('trade-direction').value = '';
   document.getElementById('trade-id').value = '';
-  document.getElementById('trade-rr').value = '';
   if (previews) previews.innerHTML = '';
   if (prompt)   prompt.style.display = '';
 
@@ -512,14 +511,14 @@ async function loadTradeIntoModal(id) {
     document.getElementById('trade-date').value        = trade.date || '';
     document.getElementById('trade-symbol').value      = trade.symbol || '';
     document.getElementById('trade-direction').value   = trade.direction || '';
-    document.getElementById('trade-entry').value       = trade.entry_price ?? '';
-    document.getElementById('trade-exit').value        = trade.exit_price ?? '';
     document.getElementById('trade-size').value        = trade.size ?? '';
-    document.getElementById('trade-sl').value          = trade.stop_loss ?? '';
-    document.getElementById('trade-tp').value          = trade.take_profit ?? '';
     document.getElementById('trade-pnl').value         = trade.pnl ?? '';
     document.getElementById('trade-risk').value        = trade.risk_amount ?? '';
-    document.getElementById('trade-rr').value          = trade.risk_reward ?? '';
+    // R = actual P&L ÷ Risk (recalculate fresh; old stored value may be planned R:R)
+    const rPnl  = parseFloat(trade.pnl);
+    const rRisk = parseFloat(trade.risk_amount);
+    document.getElementById('trade-rr').value = (!isNaN(rPnl) && !isNaN(rRisk) && rRisk > 0)
+      ? (rPnl / rRisk).toFixed(2) : '';
     document.getElementById('trade-strategy').value    = trade.strategy || '';
     document.getElementById('trade-timeframe').value   = trade.timeframe || '';
     document.getElementById('trade-session').value     = trade.session || '';
@@ -599,6 +598,12 @@ async function handleSaveTrade() {
   const tradeType = document.getElementById('trade-type').value || 'taken';
   if (!symbol)                        { showToast('Symbol is required', 'error'); return; }
   if (!direction && tradeType !== 'missed') { showToast('Select Long or Short', 'error'); return; }
+  if (tradeType === 'taken') {
+    const pnlVal  = document.getElementById('trade-pnl')?.value;
+    const riskVal = document.getElementById('trade-risk')?.value;
+    if (pnlVal === '' || pnlVal === null || pnlVal === undefined) { showToast('P&L is required', 'error'); return; }
+    if (!riskVal || parseFloat(riskVal) <= 0) { showToast('Risk amount is required (must be > 0)', 'error'); return; }
+  }
 
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving...';
@@ -623,19 +628,20 @@ async function handleSaveTrade() {
 
     const followedPlan = document.querySelector('input[name="followed-plan"]:checked')?.value || '';
 
+    const pnlVal  = parseFloatOrNull('trade-pnl');
+    const riskVal = parseFloatOrNull('trade-risk');
+    const rVal    = (pnlVal !== null && riskVal !== null && riskVal > 0)
+      ? parseFloat((pnlVal / riskVal).toFixed(2)) : null;
+
     const tradeData = {
       id:           document.getElementById('trade-id').value || undefined,
       date:         document.getElementById('trade-date').value,
       symbol:       symbol.toUpperCase(),
       direction,
-      entry_price:  parseFloatOrNull('trade-entry'),
-      exit_price:   parseFloatOrNull('trade-exit'),
       size:         parseFloatOrNull('trade-size'),
-      stop_loss:    parseFloatOrNull('trade-sl'),
-      take_profit:  parseFloatOrNull('trade-tp'),
-      pnl:          parseFloatOrNull('trade-pnl'),
-      risk_amount:  parseFloatOrNull('trade-risk'),
-      risk_reward:  parseFloatOrNull('trade-rr'),
+      pnl:          pnlVal,
+      risk_amount:  riskVal,
+      risk_reward:  rVal,
       strategy:     document.getElementById('trade-strategy').value.trim() || null,
       timeframe:    document.getElementById('trade-timeframe').value || null,
       session:      document.getElementById('trade-session').value || null,

@@ -4,7 +4,8 @@
 import { getTrades } from '../db.js';
 import { calcStats, formatCurrency, groupBy, sum, todayString,
          getMonthRange, pnlSign, pnlClass, formatDate,
-         getDirectionBadge, getOutcomeBadge, nl2br, SIGNAL_INSTRUMENTS, SIGNAL_LABELS } from '../utils.js';
+         getDirectionBadge, getOutcomeBadge, nl2br, SIGNAL_INSTRUMENTS, SIGNAL_LABELS,
+         calcTradeR, formatR } from '../utils.js';
 import { openTradeModal } from '../app.js';
 
 let charts = {};
@@ -111,10 +112,10 @@ function buildAnalyticsLayout(trades) {
         <div class="stat-value neutral">${stats.winRate.toFixed(1)}%</div>
         <div class="stat-sub">${stats.wins}W / ${stats.losses}L / ${stats.bes}BE</div>
       </div>
-      <div class="stat-card secondary">
-        <div class="stat-label">Profit Factor</div>
-        <div class="stat-value neutral">${stats.grossLoss ? stats.profitFactor.toFixed(2) : '∞'}</div>
-        <div class="stat-sub">Gross W: ${formatCurrency(stats.grossWins)}</div>
+      <div class="stat-card ${stats.tradesWithR && stats.totalR >= 0 ? 'profit' : stats.tradesWithR ? 'loss' : 'secondary'}">
+        <div class="stat-label">Total R</div>
+        <div class="stat-value ${stats.tradesWithR ? (stats.totalR >= 0 ? 'profit' : 'loss') : 'neutral'}">${stats.tradesWithR ? formatR(stats.totalR) : '—'}</div>
+        <div class="stat-sub">Avg R/trade: ${stats.tradesWithR ? formatR(stats.avgR) : '—'}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Avg Win / Loss</div>
@@ -343,8 +344,8 @@ function showDistDrilldown(idx) {
         <table>
           <thead>
             <tr>
-              <th>Date</th><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th>
-              <th>P&amp;L</th><th>R:R</th><th>Outcome</th><th>Strategy</th><th>Notes</th><th></th>
+              <th>Date</th><th>Symbol</th><th>Dir</th>
+              <th>P&amp;L</th><th>R</th><th>Outcome</th><th>Strategy</th><th>Notes</th><th></th>
             </tr>
           </thead>
           <tbody>${trades.map(t => buildDistTradeRow(t)).join('')}</tbody>
@@ -372,23 +373,22 @@ function showDistDrilldown(idx) {
 
 function buildDistTradeRow(t) {
   const hasDetails = t.notes || t.mistakes || t.screenshots?.length;
+  const r = calcTradeR(t);
   return `
     <tr class="dist-trade-row" data-id="${t.id}" style="cursor:pointer" title="Click to expand">
       <td class="td-mono">${formatDate(t.date)}</td>
       <td><strong>${t.symbol}</strong></td>
       <td>${getDirectionBadge(t.direction)}</td>
-      <td class="td-mono">${t.entry_price ?? '—'}</td>
-      <td class="td-mono">${t.exit_price ?? '—'}</td>
       <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
-      <td class="td-mono">${t.risk_reward ? t.risk_reward + 'R' : '—'}</td>
+      <td class="td-mono ${r !== null ? pnlClass(r) : ''}">${formatR(r)}</td>
       <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
       <td class="text-sm text-muted">${t.strategy || '—'}</td>
-      <td class="text-sm text-muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.notes ? t.notes.slice(0,60) + (t.notes.length > 60 ? '…' : '') : '—'}</td>
+      <td class="text-sm text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.notes ? t.notes.slice(0,60) + (t.notes.length > 60 ? '…' : '') : '—'}</td>
       <td><button class="btn btn-ghost btn-xs dist-edit-btn" data-id="${t.id}">Edit</button></td>
     </tr>
     ${hasDetails ? `
     <tr id="dist-detail-${t.id}" class="hidden">
-      <td colspan="11" style="background:var(--bg-surface);padding:12px 20px">
+      <td colspan="9" style="background:var(--bg-surface);padding:12px 20px">
         ${t.notes ? `<div class="text-sm mb-8" style="line-height:1.6;color:var(--text-secondary)">${nl2br(t.notes)}</div>` : ''}
         ${t.screenshots?.length ? `<div class="screenshots-grid">${t.screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">`).join('')}</div>` : ''}
       </td>
@@ -531,8 +531,8 @@ function showDowDrilldown(dayName) {
         <table>
           <thead>
             <tr>
-              <th>Date</th><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th>
-              <th>P&amp;L</th><th>R:R</th><th>Outcome</th><th>Strategy</th><th>Notes</th><th></th>
+              <th>Date</th><th>Symbol</th><th>Dir</th>
+              <th>P&amp;L</th><th>R</th><th>Outcome</th><th>Strategy</th><th>Notes</th><th></th>
             </tr>
           </thead>
           <tbody>${trades.map(t => buildDistTradeRow(t)).join('')}</tbody>

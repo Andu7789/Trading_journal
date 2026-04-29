@@ -4,7 +4,8 @@
 import { getJournalEntry, saveJournalEntry, getTrades } from '../db.js';
 import { todayString, formatDate, addDays, calcStats, formatCurrency,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
-         tiltLabel, tiltClass, nl2br, debounce, getSignalDisplay } from '../utils.js';
+         tiltLabel, tiltClass, nl2br, debounce, getSignalDisplay,
+         calcTradeR, formatR } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
 import { getNewsForDate, eventTime, newsFetchStatus } from '../news.js';
 
@@ -328,20 +329,25 @@ function buildTradesTable(trades, date) {
     `;
   }
 
+  const totalPnl = trades.reduce((s, t) => s + (parseFloat(t.pnl) || 0), 0);
+  const rTrades  = trades.filter(t => calcTradeR(t) !== null);
+  const totalR   = rTrades.reduce((s, t) => s + calcTradeR(t), 0);
+
   return `
     <div class="table-wrapper">
       <table>
         <thead>
-          <tr><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>Outcome</th><th>Strategy</th><th>Conf.</th><th>Tilt</th><th>Actions</th></tr>
+          <tr><th>Symbol</th><th>Dir</th><th>P&amp;L</th><th>R</th><th>Outcome</th><th>Strategy</th><th>Conf.</th><th>Tilt</th><th>Actions</th></tr>
         </thead>
         <tbody>
-          ${trades.map(t => `
+          ${trades.map(t => {
+            const r = calcTradeR(t);
+            return `
             <tr>
               <td><strong>${t.symbol}</strong></td>
               <td>${getDirectionBadge(t.direction)}</td>
-              <td class="td-mono">${t.entry_price ?? '—'}</td>
-              <td class="td-mono">${t.exit_price ?? '—'}</td>
               <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
+              <td class="td-mono ${r !== null ? pnlClass(r) : ''}">${formatR(r)}</td>
               <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
               <td class="text-muted text-sm">${t.strategy || '—'}</td>
               <td>${getSignalDisplay(t.signals)}</td>
@@ -352,8 +358,17 @@ function buildTradesTable(trades, date) {
                 </div>
               </td>
             </tr>
-          `).join('')}
+          `}).join('')}
         </tbody>
+        ${trades.length > 1 ? `
+        <tfoot>
+          <tr style="border-top:2px solid var(--border);font-weight:700">
+            <td colspan="2" class="text-xs text-muted">Day Total</td>
+            <td class="td-mono ${pnlClass(totalPnl)}">${pnlSign(totalPnl)}${formatCurrency(totalPnl)}</td>
+            <td class="td-mono ${rTrades.length ? pnlClass(totalR) : ''}">${rTrades.length ? formatR(parseFloat(totalR.toFixed(2))) : '—'}</td>
+            <td colspan="5"></td>
+          </tr>
+        </tfoot>` : ''}
       </table>
     </div>
     ${trades.some(t => t.screenshots?.length) ? buildScreenshots(trades) : ''}

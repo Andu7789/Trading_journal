@@ -110,6 +110,22 @@ export function calcRR(entry, sl, tp, direction) {
   return (reward / risk).toFixed(2);
 }
 
+export function calcTradeR(t) {
+  const pnl  = parseFloat(t.pnl);
+  const risk = parseFloat(t.risk_amount);
+  if (!isNaN(pnl) && !isNaN(risk) && risk > 0) {
+    return parseFloat((pnl / risk).toFixed(2));
+  }
+  return null;
+}
+
+export function formatR(r) {
+  if (r === null || r === undefined) return '—';
+  const n = parseFloat(r);
+  if (isNaN(n)) return '—';
+  return (n >= 0 ? '+' : '') + n.toFixed(2) + 'R';
+}
+
 export function groupBy(arr, key) {
   return arr.reduce((acc, item) => {
     const k = item[key] ?? 'Unknown';
@@ -140,6 +156,13 @@ export function calcStats(trades) {
   const avgLoss    = losses.length ? grossLoss / losses.length : 0;
   const profitFactor = grossLoss > 0 ? (grossWins / grossLoss) : wins.length ? Infinity : 0;
 
+  const tradesWithR = closed.filter(t => {
+    const risk = parseFloat(t.risk_amount);
+    return !isNaN(parseFloat(t.pnl)) && !isNaN(risk) && risk > 0;
+  });
+  const totalR = parseFloat(tradesWithR.reduce((s, t) => s + parseFloat(t.pnl) / parseFloat(t.risk_amount), 0).toFixed(2));
+  const avgR   = tradesWithR.length ? parseFloat((totalR / tradesWithR.length).toFixed(2)) : 0;
+
   return {
     total: closed.length,
     open:  trades.filter(t => t.trade_type !== 'missed' && (!t.outcome || t.outcome === 'open')).length,
@@ -156,6 +179,9 @@ export function calcStats(trades) {
     bestTrade:  closed.length ? Math.max(...closed.map(t => parseFloat(t.pnl) || 0)) : 0,
     worstTrade: closed.length ? Math.min(...closed.map(t => parseFloat(t.pnl) || 0)) : 0,
     avgRR: avg(closed.filter(t => t.risk_reward), 'risk_reward'),
+    totalR,
+    avgR,
+    tradesWithR: tradesWithR.length,
   };
 }
 

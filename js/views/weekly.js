@@ -4,7 +4,8 @@
 import { getTrades, getJournalEntries } from '../db.js';
 import { calcStats, formatCurrency, formatDate, formatDateShort,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
-         todayString, getWeekRange, addDays, nl2br, getSignalDisplay } from '../utils.js';
+         todayString, getWeekRange, addDays, nl2br, getSignalDisplay,
+         calcTradeR, formatR } from '../utils.js';
 import { openTradeModal } from '../app.js';
 
 let currentWeekStart = null;
@@ -119,10 +120,10 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries) {
         <div class="stat-value text-profit">${bestDay(days)}</div>
         <div class="stat-sub">Worst: ${worstDay(days)}</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Profit Factor</div>
-        <div class="stat-value neutral">${stats.total && stats.grossLoss ? stats.profitFactor.toFixed(2) : '—'}</div>
-        <div class="stat-sub">Avg Win: ${stats.wins ? formatCurrency(stats.avgWin) : '—'}</div>
+      <div class="stat-card ${stats.tradesWithR && stats.totalR >= 0 ? 'profit' : stats.tradesWithR ? 'loss' : ''}">
+        <div class="stat-label">Week R</div>
+        <div class="stat-value ${stats.tradesWithR ? (stats.totalR >= 0 ? 'profit' : 'loss') : 'neutral'}">${stats.tradesWithR ? formatR(stats.totalR) : '—'}</div>
+        <div class="stat-sub">Avg R/trade: ${stats.tradesWithR ? formatR(stats.avgR) : '—'}</div>
       </div>
       <div class="stat-card warning">
         <div class="stat-label">Journal Days</div>
@@ -184,8 +185,9 @@ function buildDayDetail(d) {
         <div>
           <div class="card-title" style="font-size:16px">${dateLabel}</div>
           ${dayTrades.length ? `
-            <div style="display:flex;gap:12px;margin-top:4px;font-size:13px">
-              <span class="${pnlClass(pnl)} text-mono font-weight:700">${pnlSign(pnl)}${formatCurrency(pnl)}</span>
+            <div style="display:flex;gap:12px;margin-top:4px;font-size:13px;flex-wrap:wrap">
+              <span class="${pnlClass(pnl)} text-mono" style="font-weight:700">${pnlSign(pnl)}${formatCurrency(pnl)}</span>
+              ${dayStats.tradesWithR ? `<span class="td-mono ${dayStats.totalR >= 0 ? 'text-profit' : 'text-loss'}">${formatR(dayStats.totalR)}</span>` : ''}
               <span class="text-muted">${dayStats.wins}W/${dayStats.losses}L · ${dayStats.total ? dayStats.winRate.toFixed(0) + '%' : '0%'} WR</span>
             </div>
           ` : '<div class="text-xs text-muted">No trades</div>'}
@@ -205,23 +207,23 @@ function buildWeekTradeTable(trades) {
     <div class="table-wrapper" style="margin-bottom:16px">
       <table>
         <thead>
-          <tr><th>Symbol</th><th>Dir</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>R:R</th><th>Outcome</th><th>Strategy</th><th>Conf.</th><th>Notes</th></tr>
+          <tr><th>Symbol</th><th>Dir</th><th>P&amp;L</th><th>R</th><th>Outcome</th><th>Strategy</th><th>Conf.</th><th>Notes</th></tr>
         </thead>
         <tbody>
-          ${trades.map(t => `
+          ${trades.map(t => {
+            const r = calcTradeR(t);
+            return `
             <tr style="cursor:pointer" onclick="window._openTradeModalWeekly('${t.id}')">
               <td><strong>${t.symbol}</strong></td>
               <td>${getDirectionBadge(t.direction)}</td>
-              <td class="td-mono">${t.entry_price ?? '—'}</td>
-              <td class="td-mono">${t.exit_price ?? '—'}</td>
               <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
-              <td class="td-mono">${t.risk_reward ? t.risk_reward + 'R' : '—'}</td>
+              <td class="td-mono ${r !== null ? pnlClass(r) : ''}">${formatR(r)}</td>
               <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
               <td class="text-sm text-muted">${t.strategy || '—'}</td>
               <td>${getSignalDisplay(t.signals)}</td>
               <td class="text-sm text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${t.notes ? t.notes.slice(0,60) + (t.notes.length > 60 ? '...' : '') : '—'}</td>
             </tr>
-          `).join('')}
+          `}).join('')}
         </tbody>
       </table>
     </div>

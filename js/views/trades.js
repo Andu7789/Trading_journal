@@ -4,7 +4,8 @@
 import { getTrades, deleteTrade, getClient } from '../db.js';
 import { calcStats, formatCurrency, formatDate, pnlClass, pnlSign,
          getOutcomeBadge, getDirectionBadge, getEmotionChip,
-         todayString, getWeekRange, addDays, nl2br, getSignalDisplay, SIGNAL_LABELS } from '../utils.js';
+         todayString, getWeekRange, addDays, nl2br, getSignalDisplay, SIGNAL_LABELS,
+         calcTradeR, formatR } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
 
 let currentFilters = {};
@@ -182,10 +183,10 @@ async function loadTrades() {
           <div class="stat-value neutral">${stats.total ? stats.winRate.toFixed(1) + '%' : '—'}</div>
           <div class="stat-sub">${stats.wins}W / ${stats.losses}L</div>
         </div>
-        <div class="stat-card secondary">
-          <div class="stat-label">Profit Factor</div>
-          <div class="stat-value neutral">${stats.total && stats.grossLoss ? stats.profitFactor.toFixed(2) : '—'}</div>
-          <div class="stat-sub">Gross W / Gross L</div>
+        <div class="stat-card ${stats.tradesWithR && stats.totalR >= 0 ? 'profit' : stats.tradesWithR ? 'loss' : 'secondary'}">
+          <div class="stat-label">Total R</div>
+          <div class="stat-value ${stats.tradesWithR ? (stats.totalR >= 0 ? 'profit' : 'loss') : 'neutral'}">${stats.tradesWithR ? formatR(stats.totalR) : '—'}</div>
+          <div class="stat-sub">Avg R: ${stats.tradesWithR ? formatR(stats.avgR) : '—'}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Avg Win</div>
@@ -220,13 +221,9 @@ async function loadTrades() {
               <th>Date</th>
               <th>Symbol</th>
               <th>Direction</th>
-              <th>Entry</th>
-              <th>Exit</th>
               <th>Size</th>
-              <th>SL</th>
-              <th>TP</th>
               <th>P&amp;L</th>
-              <th>R:R</th>
+              <th>R</th>
               <th>Outcome</th>
               <th>Strategy</th>
               <th>TF</th>
@@ -277,19 +274,16 @@ async function loadTrades() {
 function buildTradeRow(t) {
   const hasDetails = t.notes || t.mistakes || (t.screenshots && t.screenshots.length) || t.tags?.length || t.signals?.length;
   const signals = Array.isArray(t.signals) ? t.signals : [];
+  const r = calcTradeR(t);
 
   return `
     <tr class="trade-row-main" data-id="${t.id}" style="cursor:pointer" title="Click to expand notes">
       <td class="td-mono">${formatDate(t.date)}</td>
       <td><strong>${t.symbol}</strong></td>
       <td>${getDirectionBadge(t.direction)}</td>
-      <td class="td-mono">${t.entry_price ?? '—'}</td>
-      <td class="td-mono">${t.exit_price ?? '—'}</td>
       <td class="td-mono">${t.size ?? '—'}</td>
-      <td class="td-mono">${t.stop_loss ?? '—'}</td>
-      <td class="td-mono">${t.take_profit ?? '—'}</td>
       <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
-      <td class="td-mono">${t.risk_reward ? t.risk_reward + 'R' : '—'}</td>
+      <td class="td-mono ${r !== null ? pnlClass(r) : ''}">${formatR(r)}</td>
       <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
       <td class="text-sm text-muted">${t.strategy || '—'}</td>
       <td class="text-sm text-muted">${t.timeframe || '—'}</td>
@@ -305,7 +299,7 @@ function buildTradeRow(t) {
     </tr>
     ${hasDetails ? `
     <tr id="detail-${t.id}" class="hidden">
-      <td colspan="17" style="background:var(--bg-surface);padding:16px 20px">
+      <td colspan="13" style="background:var(--bg-surface);padding:16px 20px">
         ${signals.length ? `
           <div style="margin-bottom:12px">
             <div class="text-xs text-muted mb-8">Signal Confluence (${signals.length}/4)</div>

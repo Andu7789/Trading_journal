@@ -4,7 +4,8 @@
 import { getTrades, getJournalEntry } from '../db.js';
 import { calcStats, formatCurrency, formatPnL, pnlClass, pnlSign,
          todayString, formatDate, getWeekRange, getMonthRange,
-         getDaysInMonth, getOutcomeBadge, getDirectionBadge, addDays } from '../utils.js';
+         getDaysInMonth, getOutcomeBadge, getDirectionBadge, addDays,
+         calcTradeR, formatR } from '../utils.js';
 import { openTradeModal } from '../app.js';
 
 let equityChart = null;
@@ -117,20 +118,23 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
             <table>
               <thead>
                 <tr>
-                  <th>Date</th><th>Symbol</th><th>Dir</th><th>P&amp;L</th><th>Outcome</th><th>Strategy</th>
+                  <th>Date</th><th>Symbol</th><th>Dir</th><th>P&amp;L</th><th>R</th><th>Outcome</th><th>Strategy</th>
                 </tr>
               </thead>
               <tbody>
-                ${recentTrades.map(t => `
+                ${recentTrades.map(t => {
+                  const r = calcTradeR(t);
+                  return `
                   <tr style="cursor:pointer" onclick="window._openTradeModal('${t.id}')">
                     <td class="td-mono">${formatDate(t.date)}</td>
                     <td><strong>${t.symbol}</strong></td>
                     <td>${getDirectionBadge(t.direction)}</td>
                     <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
+                    <td class="td-mono ${r !== null ? pnlClass(r) : ''}">${formatR(r)}</td>
                     <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
                     <td class="text-muted text-sm">${t.strategy || '—'}</td>
                   </tr>
-                `).join('')}
+                `}).join('')}
               </tbody>
             </table>
           </div>
@@ -201,12 +205,18 @@ function renderCalendar(trades, today) {
   const el = document.getElementById('pnl-calendar');
   if (!el) return;
 
-  // Group trades by date, sum PnL
+  // Group trades by date, sum PnL and R
   const pnlByDate = {};
+  const rByDate   = {};
   trades.forEach(t => {
     const d = t.date;
     if (!pnlByDate[d]) pnlByDate[d] = 0;
     pnlByDate[d] += parseFloat(t.pnl) || 0;
+    const r = calcTradeR(t);
+    if (r !== null) {
+      if (!rByDate[d]) rByDate[d] = 0;
+      rByDate[d] = parseFloat((rByDate[d] + r).toFixed(2));
+    }
   });
 
   const now = new Date();
@@ -232,15 +242,20 @@ function renderCalendar(trades, today) {
 
     let cls = 'no-trades';
     let pnlLabel = '';
+    let rLabel   = '';
     if (pnl !== undefined) {
       cls = pnl > 0 ? 'profit' : pnl < 0 ? 'loss' : 'breakeven';
       pnlLabel = `<div class="cal-day-pnl">${pnl > 0 ? '+' : ''}${Math.round(pnl)}</div>`;
+      if (rByDate[dateStr] !== undefined) {
+        const rd = rByDate[dateStr];
+        rLabel = `<div style="font-size:9px;font-family:var(--font-mono);color:${rd >= 0 ? 'var(--profit)' : 'var(--loss)'};opacity:0.85">${rd >= 0 ? '+' : ''}${rd.toFixed(1)}R</div>`;
+      }
     }
 
     html += `
-      <div class="cal-day ${cls} ${isToday ? 'today' : ''}" title="${dateStr}: ${pnl !== undefined ? formatCurrency(pnl) : 'No trades'}">
+      <div class="cal-day ${cls} ${isToday ? 'today' : ''}" title="${dateStr}: ${pnl !== undefined ? formatCurrency(pnl) : 'No trades'}${rByDate[dateStr] !== undefined ? ' / ' + formatR(rByDate[dateStr]) : ''}">
         <div class="cal-day-num">${day}</div>
-        ${pnlLabel}
+        ${pnlLabel}${rLabel}
       </div>`;
   }
 
