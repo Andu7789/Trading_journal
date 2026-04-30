@@ -745,14 +745,11 @@ function buildSetupRow(s) {
 
   const screenshots = s.screenshots || [];
   const screenshotCell = screenshots.length
-    ? `<div data-ss-section>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <span class="text-xs text-muted">Screenshots (${screenshots.length})</span>
-          ${screenshots.length > 1 ? `<button class="btn btn-ghost btn-xs" onclick="window._openGalleryFromSection(this)">View All</button>` : ''}
-        </div>
+    ? `<div data-ss-section style="display:flex;align-items:center;gap:8px">
         <div class="screenshots-grid">
           ${screenshots.map(url => `<img src="${url}" class="screenshot-thumb" onclick="window._viewPreview(this)" alt="screenshot">`).join('')}
         </div>
+        ${screenshots.length > 1 ? `<button class="btn btn-ghost btn-xs" onclick="window._openGalleryFromSection(this)">View All</button>` : ''}
       </div>`
     : '—';
 
