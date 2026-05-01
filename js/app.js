@@ -4,7 +4,7 @@
 import { initSupabase, isConnected, testConnection, saveTrade,
          getTradeById, getDistinctSymbols, uploadScreenshot,
          getAuthSession, signInWithGoogle, signOut } from './db.js';
-import { todayString, tiltLabel, tiltClass, formatCurrency } from './utils.js';
+import { todayString, tiltLabel, tiltClass, formatCurrency, calcTradeR, formatR } from './utils.js';
 
 // ---- Views ----
 import { renderDashboard } from './views/dashboard.js';
@@ -374,13 +374,24 @@ function setupTradeModal() {
         picker.innerHTML = '<div style="padding:8px 12px;color:var(--text-muted)">No trades found for this date.</div>';
         return;
       }
-      picker.innerHTML = trades.map(t => `
+      picker.innerHTML = trades.map(t => {
+        const r   = calcTradeR(t);
+        const pnl = parseFloat(t.pnl);
+        const pnlStr = isNaN(pnl) ? '—' : formatCurrency(pnl);
+        const pnlColor = isNaN(pnl) ? 'var(--text-muted)' : pnl >= 0 ? 'var(--profit)' : 'var(--loss)';
+        const rColor   = r === null ? 'var(--text-muted)' : r >= 0 ? 'var(--profit)' : 'var(--loss)';
+        return `
         <div class="see-trade-item" data-id="${t.id}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center" onmouseenter="this.style.background='var(--bg-hover)'" onmouseleave="this.style.background=''">
           <span style="font-weight:600">${t.symbol || '—'}</span>
           <span style="color:var(--text-muted);font-size:0.85em">${t.direction || ''}</span>
           <span style="color:var(--text-muted);font-size:0.85em">${t.strategy || ''}</span>
-          <span style="margin-left:auto;font-size:0.85em;color:var(--text-muted)">${t.outcome || ''}</span>
-        </div>`).join('');
+          <span style="margin-left:auto;display:flex;gap:10px;align-items:center">
+            <span style="font-size:0.85em;color:${pnlColor}">${pnlStr}</span>
+            <span style="font-size:0.85em;font-weight:600;color:${rColor}">${formatR(r)}</span>
+            <span style="font-size:0.85em;color:var(--text-muted)">${t.outcome || ''}</span>
+          </span>
+        </div>`;
+      }).join('');
 
       picker.querySelectorAll('.see-trade-item').forEach(item => {
         item.addEventListener('click', () => {
