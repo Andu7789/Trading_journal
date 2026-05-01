@@ -8,12 +8,12 @@ import { calcStats, formatCurrency, formatDate, formatDateShort,
          calcTradeR, formatR } from '../utils.js';
 import { openTradeModal } from '../app.js';
 
-let currentWeekStart = null;
+let currentWeekStart  = null;
+let weeklyEquityChart = null;
 
 export async function renderWeekly(container) {
   document.getElementById('page-title').textContent = 'Weekly Review';
 
-  // Start at current week
   if (!currentWeekStart) {
     currentWeekStart = getWeekRange(todayString()).start;
   }
@@ -62,11 +62,11 @@ async function loadWeek() {
 
   const weekEnd = addDays(currentWeekStart, 6);
 
-  // Update label
   const start = new Date(currentWeekStart + 'T00:00:00');
   const end   = new Date(weekEnd + 'T00:00:00');
   label.textContent = `${start.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})} — ${end.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}`;
 
+  if (weeklyEquityChart) { weeklyEquityChart.destroy(); weeklyEquityChart = null; }
   content.innerHTML = `<div class="loading-screen"><div class="loading-spinner"></div></div>`;
 
   try {
@@ -77,6 +77,7 @@ async function loadWeek() {
 
     content.innerHTML = buildWeeklyContent(currentWeekStart, weekEnd, trades, journalEntries);
     wireWeeklyInteractions(trades, journalEntries);
+    renderWeeklyEquityChart(trades);
   } catch (err) {
     content.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
   }
@@ -86,7 +87,6 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries) {
   const today = todayString();
   const stats = calcStats(trades);
 
-  // Build day map
   const days = [];
   for (let i = 0; i < 7; i++) {
     const date = addDays(startDate, i);
@@ -99,10 +99,23 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries) {
     days.push({ date, dayTrades, dayJournal, dayStats, dayLabel, dayNum });
   }
 
-  const weekPnl = stats.totalPnl;
+  const weekPnl   = stats.totalPnl;
   const weekClass = weekPnl >= 0 ? 'profit' : 'loss';
 
   return `
+    <!-- Equity Curve -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Week Equity Curve</div>
+          <div class="card-subtitle">Cumulative P&amp;L trade-by-trade</div>
+        </div>
+      </div>
+      <div class="chart-container" id="weekly-equity-container">
+        <canvas id="weekly-equity-chart"></canvas>
+      </div>
+    </div>
+
     <!-- Week Stats -->
     <div class="stats-grid" style="margin-bottom:20px">
       <div class="stat-card ${weekClass}">
@@ -150,6 +163,95 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries) {
       </div>
     ` : ''}
   `;
+}
+
+function renderWeeklyEquityChart(trades) {
+  const canvas = document.getElementById('weekly-equity-chart');
+  if (!canvas) return;
+
+  if (weeklyEquityChart) { weeklyEquityChart.destroy(); weeklyEquityChart = null; }
+
+  const sorted = [...trades]
+    .filter(t => t.outcome && t.outcome !== 'open' && t.pnl !== null)
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    });
+
+  canvas.style.display = '';
+  canvas.parentElement.querySelector('.chart-empty-msg')?.remove();
+
+  if (!sorted.length) {
+    canvas.style.display = 'none';
+    const msg = document.createElement('div');
+    msg.className = 'chart-empty-msg empty-state';
+    msg.innerHTML = '<p class="text-muted text-sm">No trades this week to chart</p>';
+    canvas.parentElement.appendChild(msg);
+    return;
+  }
+
+  let cumulative = 0;
+  const labels = [];
+  const data   = [];
+  sorted.forEach(t => {
+    cumulative += parseFloat(t.pnl) || 0;
+    labels.push(`${t.date} ${t.symbol || ''}`);
+    data.push(parseFloat(cumulative.toFixed(2)));
+  });
+
+  const isProfit = cumulative >= 0;
+  const color    = isProfit ? '#00d97e' : '#ff4757';
+
+  weeklyEquityChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: color,
+        borderWidth: 2,
+        fill: true,
+        backgroundColor: (ctx) => {
+          const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 180);
+          gradient.addColorStop(0, isProfit ? 'rgba(0,217,126,0.3)' : 'rgba(255,71,87,0.3)');
+          gradient.addColorStop(1, 'rgba(0,0,0,0)');
+          return gradient;
+        },
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: color,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f1c30',
+          borderColor: '#1e3558',
+          borderWidth: 1,
+          callbacks: {
+            title: (items) => items[0].label,
+            label: (ctx) => ` Equity: ${formatCurrency(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: { display: false, grid: { display: false } },
+        y: {
+          grid: { color: 'rgba(30,53,88,0.5)' },
+          ticks: {
+            color: '#4a6080',
+            font: { family: 'JetBrains Mono', size: 11 },
+            callback: (v) => formatCurrency(v, 0)
+          }
+        }
+      }
+    }
+  });
 }
 
 function buildDayCard(d, today) {

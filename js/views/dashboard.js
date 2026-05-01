@@ -9,16 +9,20 @@ import { calcStats, formatCurrency, formatPnL, pnlClass, pnlSign,
 import { openTradeModal } from '../app.js';
 
 let equityChart = null;
+let dashYear    = null;
+let dashMonth   = null;
 
 export async function renderDashboard(container) {
   container.innerHTML = `<div class="loading-screen"><div class="loading-spinner"></div></div>`;
   document.getElementById('page-title').textContent = 'Dashboard';
 
+  const now = new Date();
+  if (dashYear === null)  dashYear  = now.getFullYear();
+  if (dashMonth === null) dashMonth = now.getMonth() + 1;
+
   try {
     const today = todayString();
-    const { start: monthStart, end: monthEnd } = getMonthRange(
-      new Date().getFullYear(), new Date().getMonth() + 1
-    );
+    const { start: monthStart, end: monthEnd } = getMonthRange(dashYear, dashMonth);
 
     const [todayTrades, monthTrades, journalEntry] = await Promise.all([
       getTrades({ date: today }),
@@ -36,13 +40,67 @@ export async function renderDashboard(container) {
   }
 }
 
+function buildMonthStatCards(monthStats) {
+  const monthPnl   = monthStats.totalPnl;
+  const monthClass = monthPnl >= 0 ? 'profit' : 'loss';
+  return `
+    <div class="stat-card ${monthClass}">
+      <div class="stat-label">Month P&amp;L</div>
+      <div class="stat-value ${monthClass}">${pnlSign(monthPnl)}${formatCurrency(monthPnl)}</div>
+      <div class="stat-sub">${monthStats.total} trades this month</div>
+    </div>
+    <div class="stat-card secondary">
+      <div class="stat-label">Month Win Rate</div>
+      <div class="stat-value neutral">${monthStats.total ? monthStats.winRate.toFixed(1) + '%' : '—'}</div>
+      <div class="stat-sub">PF: ${monthStats.total && monthStats.grossLoss ? monthStats.profitFactor.toFixed(2) : '—'}</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-label">Best Trade (Month)</div>
+      <div class="stat-value neutral text-profit">${monthStats.total ? formatCurrency(monthStats.bestTrade) : '—'}</div>
+      <div class="stat-sub">${monthStats.worstTrade < 0 ? 'Worst' : 'Smallest'}: ${monthStats.total ? formatCurrency(monthStats.worstTrade) : '—'}</div>
+    </div>
+  `;
+}
+
+function buildRecentTradesContent(monthTrades) {
+  const recentTrades = monthTrades.slice(0, 8);
+  if (!recentTrades.length) return `
+    <div class="empty-state" style="padding:24px">
+      <p>No trades logged yet. <button class="btn btn-primary btn-sm" onclick="window._openTradeModal()">Add your first trade</button></p>
+    </div>
+  `;
+  return `
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Symbol</th><th>Dir</th><th>P&amp;L</th><th>R</th><th>Outcome</th><th>Strategy</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${recentTrades.map(t => {
+            const r = calcTradeR(t);
+            return `
+            <tr style="cursor:pointer" onclick="window._openTradeModal('${t.id}')">
+              <td class="td-mono">${formatDate(t.date)}</td>
+              <td><strong>${t.symbol}</strong></td>
+              <td>${getDirectionBadge(t.direction)}</td>
+              <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
+              <td class="td-mono ${r !== null ? pnlClass(r) : ''}">${formatR(r)}</td>
+              <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
+              <td class="text-muted text-sm">${t.strategy || '—'}</td>
+            </tr>
+          `}).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats, journalEntry) {
   const todayPnl   = todayStats.totalPnl;
-  const monthPnl   = monthStats.totalPnl;
   const todayClass = todayPnl >= 0 ? 'profit' : 'loss';
-  const monthClass = monthPnl >= 0 ? 'profit' : 'loss';
-
-  const recentTrades = monthTrades.slice(0, 8);
+  const monthLabel = new Date(dashYear, dashMonth - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
   return `
     <div class="page-header">
@@ -56,7 +114,7 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
       </button>
     </div>
 
-    <!-- Today Stats -->
+    <!-- Stats -->
     <div class="stats-grid" style="margin-bottom:20px">
       <div class="stat-card ${todayClass}">
         <div class="stat-label">Today's P&amp;L</div>
@@ -68,20 +126,8 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
         <div class="stat-value neutral">${todayStats.total ? todayStats.winRate.toFixed(0) + '%' : '—'}</div>
         <div class="stat-sub">${todayStats.wins}W / ${todayStats.losses}L</div>
       </div>
-      <div class="stat-card ${monthClass}">
-        <div class="stat-label">Month P&amp;L</div>
-        <div class="stat-value ${monthClass}">${pnlSign(monthPnl)}${formatCurrency(monthPnl)}</div>
-        <div class="stat-sub">${monthStats.total} trades this month</div>
-      </div>
-      <div class="stat-card secondary">
-        <div class="stat-label">Month Win Rate</div>
-        <div class="stat-value neutral">${monthStats.total ? monthStats.winRate.toFixed(1) + '%' : '—'}</div>
-        <div class="stat-sub">PF: ${monthStats.total && monthStats.grossLoss ? monthStats.profitFactor.toFixed(2) : '—'}</div>
-      </div>
-      <div class="stat-card warning">
-        <div class="stat-label">Best Trade (Month)</div>
-        <div class="stat-value neutral text-profit">${monthStats.total ? formatCurrency(monthStats.bestTrade) : '—'}</div>
-        <div class="stat-sub">${monthStats.worstTrade < 0 ? 'Worst' : 'Smallest'}: ${monthStats.total ? formatCurrency(monthStats.worstTrade) : '—'}</div>
+      <div id="month-stat-cards" style="display:contents">
+        ${buildMonthStatCards(monthStats)}
       </div>
     </div>
 
@@ -95,10 +141,10 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
           <div class="card-header">
             <div>
               <div class="card-title">Equity Curve</div>
-              <div class="card-subtitle">Cumulative P&amp;L — this month</div>
+              <div class="card-subtitle" id="equity-subtitle">Cumulative P&amp;L — ${monthLabel}</div>
             </div>
           </div>
-          <div class="chart-container">
+          <div class="chart-container" id="equity-chart-container">
             <canvas id="equity-chart"></canvas>
           </div>
         </div>
@@ -109,36 +155,9 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
             <div class="card-title">Recent Trades</div>
             <a href="#trades" class="btn btn-ghost btn-sm">View All</a>
           </div>
-          ${recentTrades.length === 0 ? `
-            <div class="empty-state" style="padding:24px">
-              <p>No trades logged yet. <button class="btn btn-primary btn-sm" onclick="window._openTradeModal()">Add your first trade</button></p>
-            </div>
-          ` : `
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th><th>Symbol</th><th>Dir</th><th>P&amp;L</th><th>R</th><th>Outcome</th><th>Strategy</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${recentTrades.map(t => {
-                  const r = calcTradeR(t);
-                  return `
-                  <tr style="cursor:pointer" onclick="window._openTradeModal('${t.id}')">
-                    <td class="td-mono">${formatDate(t.date)}</td>
-                    <td><strong>${t.symbol}</strong></td>
-                    <td>${getDirectionBadge(t.direction)}</td>
-                    <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
-                    <td class="td-mono ${r !== null ? pnlClass(r) : ''}">${formatR(r)}</td>
-                    <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
-                    <td class="text-muted text-sm">${t.strategy || '—'}</td>
-                  </tr>
-                `}).join('')}
-              </tbody>
-            </table>
+          <div id="recent-trades-content">
+            ${buildRecentTradesContent(monthTrades)}
           </div>
-          `}
         </div>
       </div>
 
@@ -149,7 +168,11 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
         <div class="card">
           <div class="card-header">
             <div class="card-title">Monthly Calendar</div>
-            <span class="text-muted text-sm">${new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <button class="btn btn-ghost btn-sm" id="cal-prev" title="Previous month">‹</button>
+              <span class="text-muted text-sm" id="cal-month-label" style="min-width:110px;text-align:center">${monthLabel}</span>
+              <button class="btn btn-ghost btn-sm" id="cal-next" title="Next month">›</button>
+            </div>
           </div>
           <div id="pnl-calendar"></div>
         </div>
@@ -196,16 +219,52 @@ function buildJournalSnapshot(entry, trades) {
 }
 
 function initDashboard(today, todayTrades, monthTrades) {
-  renderCalendar(monthTrades, today);
+  renderCalendar(monthTrades, today, dashYear, dashMonth);
   renderEquityChart(monthTrades);
   window._openTradeModal = (id) => openTradeModal(id, today);
+
+  document.getElementById('cal-prev')?.addEventListener('click', () => navigateDashMonth(-1, today));
+  document.getElementById('cal-next')?.addEventListener('click', () => navigateDashMonth(1, today));
 }
 
-function renderCalendar(trades, today) {
+async function navigateDashMonth(delta, today) {
+  let m = dashMonth + delta;
+  let y = dashYear;
+  if (m < 1)  { m = 12; y--; }
+  if (m > 12) { m = 1;  y++; }
+  dashYear  = y;
+  dashMonth = m;
+
+  const monthLabel = new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+  const labelEl = document.getElementById('cal-month-label');
+  if (labelEl) labelEl.textContent = monthLabel;
+  const subEl = document.getElementById('equity-subtitle');
+  if (subEl) subEl.textContent = `Cumulative P&L — ${monthLabel}`;
+
+  try {
+    const { start, end } = getMonthRange(y, m);
+    const monthTrades = await getTrades({ startDate: start, endDate: end });
+    const monthStats  = calcStats(monthTrades);
+
+    const statCards = document.getElementById('month-stat-cards');
+    if (statCards) statCards.innerHTML = buildMonthStatCards(monthStats);
+
+    renderEquityChart(monthTrades);
+
+    const recentEl = document.getElementById('recent-trades-content');
+    if (recentEl) recentEl.innerHTML = buildRecentTradesContent(monthTrades);
+
+    renderCalendar(monthTrades, today, y, m);
+  } catch (err) {
+    console.error('Failed to load month data:', err);
+  }
+}
+
+function renderCalendar(trades, today, year = new Date().getFullYear(), month = new Date().getMonth() + 1) {
   const el = document.getElementById('pnl-calendar');
   if (!el) return;
 
-  // Group trades by date, sum PnL and R
   const pnlByDate = {};
   const rByDate   = {};
   trades.forEach(t => {
@@ -219,25 +278,19 @@ function renderCalendar(trades, today) {
     }
   });
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDay = new Date(year, month - 1, 1).getDay(); // 0=Sun
-  const startOffset = (firstDay + 6) % 7; // Monday start
+  const daysInMonth  = getDaysInMonth(year, month);
+  const firstDay     = new Date(year, month - 1, 1).getDay();
+  const startOffset  = (firstDay + 6) % 7; // Monday start
 
   const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   let html = `<div class="pnl-calendar">`;
   dayNames.forEach(d => html += `<div class="cal-header">${d}</div>`);
 
-  // Empty cells before first day
-  for (let i = 0; i < startOffset; i++) {
-    html += `<div class="cal-day empty"></div>`;
-  }
+  for (let i = 0; i < startOffset; i++) html += `<div class="cal-day empty"></div>`;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const pnl = pnlByDate[dateStr];
+    const pnl     = pnlByDate[dateStr];
     const isToday = dateStr === today;
 
     let cls = 'no-trades';
@@ -269,7 +322,6 @@ function renderEquityChart(trades) {
 
   if (equityChart) { equityChart.destroy(); equityChart = null; }
 
-  // Sort by date then created_at, cumulate PnL
   const sorted = [...trades]
     .filter(t => t.outcome && t.outcome !== 'open' && t.pnl !== null)
     .sort((a, b) => {
@@ -277,8 +329,16 @@ function renderEquityChart(trades) {
       return (a.created_at || '').localeCompare(b.created_at || '');
     });
 
+  canvas.style.display = '';
+  const emptyMsg = canvas.parentElement.querySelector('.chart-empty-msg');
+  if (emptyMsg) emptyMsg.remove();
+
   if (!sorted.length) {
-    canvas.parentElement.innerHTML = `<div class="empty-state"><p class="text-muted text-sm">Trade some to see your equity curve</p></div>`;
+    canvas.style.display = 'none';
+    const msg = document.createElement('div');
+    msg.className = 'chart-empty-msg empty-state';
+    msg.innerHTML = '<p class="text-muted text-sm">No trades this month to chart</p>';
+    canvas.parentElement.appendChild(msg);
     return;
   }
 
@@ -292,7 +352,7 @@ function renderEquityChart(trades) {
   });
 
   const isProfit = cumulative >= 0;
-  const color = isProfit ? '#00d97e' : '#ff4757';
+  const color    = isProfit ? '#00d97e' : '#ff4757';
 
   equityChart = new Chart(canvas, {
     type: 'line',
@@ -331,10 +391,7 @@ function renderEquityChart(trades) {
         }
       },
       scales: {
-        x: {
-          display: false,
-          grid: { display: false }
-        },
+        x: { display: false, grid: { display: false } },
         y: {
           grid: { color: 'rgba(30,53,88,0.5)' },
           ticks: {
