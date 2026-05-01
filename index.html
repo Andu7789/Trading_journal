@@ -248,7 +248,11 @@
 
             <!-- Signal Confluence -->
             <div class="form-section">
-              <h3 class="form-section-title">Signal Confluence</h3>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <h3 class="form-section-title" style="margin-bottom:0">Signal Confluence</h3>
+                <button type="button" id="see-eurusd-btn" class="btn btn-ghost btn-xs">See EURUSD</button>
+              </div>
+              <div id="see-trade-picker" style="display:none;margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;max-height:200px;overflow-y:auto"></div>
               <div class="form-group">
                 <label class="form-label">Which instruments showed a signal at a swing point?</label>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">

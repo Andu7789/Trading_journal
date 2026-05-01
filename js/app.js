@@ -355,6 +355,77 @@ function setupTradeModal() {
     if (el) el.oninput = recalcR;
   });
 
+  // See EURUSD — copy signals/psychology from another trade on same day
+  document.getElementById('see-eurusd-btn')?.addEventListener('click', async () => {
+    const picker = document.getElementById('see-trade-picker');
+    if (!picker) return;
+    if (picker.style.display !== 'none') { picker.style.display = 'none'; return; }
+
+    const date = document.getElementById('trade-date')?.value;
+    if (!date) { alert('Set a date first.'); return; }
+
+    picker.innerHTML = '<div style="padding:8px 12px;color:var(--text-muted)">Loading…</div>';
+    picker.style.display = 'block';
+
+    try {
+      const { getTrades } = await import('./db.js');
+      const trades = await getTrades({ date });
+      if (!trades.length) {
+        picker.innerHTML = '<div style="padding:8px 12px;color:var(--text-muted)">No trades found for this date.</div>';
+        return;
+      }
+      picker.innerHTML = trades.map(t => `
+        <div class="see-trade-item" data-id="${t.id}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center" onmouseenter="this.style.background='var(--bg-hover)'" onmouseleave="this.style.background=''">
+          <span style="font-weight:600">${t.symbol || '—'}</span>
+          <span style="color:var(--text-muted);font-size:0.85em">${t.direction || ''}</span>
+          <span style="color:var(--text-muted);font-size:0.85em">${t.strategy || ''}</span>
+          <span style="margin-left:auto;font-size:0.85em;color:var(--text-muted)">${t.outcome || ''}</span>
+        </div>`).join('');
+
+      picker.querySelectorAll('.see-trade-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const trade = trades.find(t => t.id === item.dataset.id);
+          if (!trade) return;
+
+          // Copy signal confluence
+          const signalBtns = document.querySelectorAll('#trade-form .signal-toggle[data-signal]');
+          const tradeSignals = Array.isArray(trade.signals) ? trade.signals : [];
+          signalBtns.forEach(b => b.classList.toggle('active', tradeSignals.includes(b.dataset.signal)));
+          updateTradeSignalScore();
+
+          // Copy psychology
+          const tiltEl = document.getElementById('trade-tilt');
+          if (tiltEl && trade.tilt != null) {
+            tiltEl.value = trade.tilt;
+            const tiltValEl = document.getElementById('tilt-value');
+            if (tiltValEl) {
+              tiltValEl.textContent = tiltLabel(trade.tilt);
+              tiltValEl.className   = `tilt-display ${tiltClass(trade.tilt)}`;
+            }
+          }
+          const emotionEl = document.getElementById('trade-emotion');
+          if (emotionEl && trade.emotion) emotionEl.value = trade.emotion;
+
+          const planVal = trade.followed_plan || '';
+          document.querySelectorAll('input[name="followed-plan"]').forEach(r => {
+            r.checked = r.value === planVal;
+          });
+
+          const mistakeEl = document.getElementById('trade-mistake-type');
+          if (mistakeEl) mistakeEl.value = trade.mistake_type || '';
+
+          // Set notes
+          const notesEl = document.getElementById('trade-notes');
+          if (notesEl) notesEl.value = 'See EURUSD';
+
+          picker.style.display = 'none';
+        });
+      });
+    } catch (err) {
+      picker.innerHTML = `<div style="padding:8px 12px;color:var(--danger)">${err.message}</div>`;
+    }
+  });
+
   // Screenshot upload
   setupScreenshotZone();
 }
@@ -597,6 +668,8 @@ async function loadTradeIntoModal(id) {
 
 function closeTradeModal() {
   document.getElementById('trade-modal').classList.add('hidden');
+  const picker = document.getElementById('see-trade-picker');
+  if (picker) picker.style.display = 'none';
   pendingScreenshots = [];
   tradeCallback = null;
 }
