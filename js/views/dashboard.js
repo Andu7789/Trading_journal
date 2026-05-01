@@ -43,7 +43,13 @@ export async function renderDashboard(container) {
 function buildMonthStatCards(monthStats) {
   const monthPnl   = monthStats.totalPnl;
   const monthClass = monthPnl >= 0 ? 'profit' : 'loss';
+  const rClass     = monthStats.tradesWithR ? (monthStats.totalR >= 0 ? 'profit' : 'loss') : '';
   return `
+    <div class="stat-card ${rClass}">
+      <div class="stat-label">Month R</div>
+      <div class="stat-value ${rClass || 'neutral'}">${monthStats.tradesWithR ? formatR(monthStats.totalR) : '—'}</div>
+      <div class="stat-sub">Avg ${monthStats.tradesWithR ? formatR(monthStats.avgR) : '—'} / trade</div>
+    </div>
     <div class="stat-card ${monthClass}">
       <div class="stat-label">Month P&amp;L</div>
       <div class="stat-value ${monthClass}">${pnlSign(monthPnl)}${formatCurrency(monthPnl)}</div>
@@ -120,11 +126,6 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
         <div class="stat-label">Today's P&amp;L</div>
         <div class="stat-value ${todayClass}">${pnlSign(todayPnl)}${formatCurrency(todayPnl)}</div>
         <div class="stat-sub">${todayStats.total} closed trade${todayStats.total !== 1 ? 's' : ''}</div>
-      </div>
-      <div class="stat-card primary">
-        <div class="stat-label">Today Win Rate</div>
-        <div class="stat-value neutral">${todayStats.total ? todayStats.winRate.toFixed(0) + '%' : '—'}</div>
-        <div class="stat-sub">${todayStats.wins}W / ${todayStats.losses}L</div>
       </div>
       <div id="month-stat-cards" style="display:contents">
         ${buildMonthStatCards(monthStats)}
