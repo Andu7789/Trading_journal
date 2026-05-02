@@ -2,12 +2,15 @@
 //  STRATEGY TRACKER VIEW
 // =============================================
 import { getStrategySetups, saveStrategySetup, deleteStrategySetup, uploadScreenshot } from '../db.js';
-import { todayString, getWeekRange, addDays, formatDate, formatDateShort,
+import { todayString, getWeekRange, getMonthRange, getDaysInMonth,
+         addDays, formatDate, formatDateShort,
          escapeHtml, nl2br, getSignalDisplay } from '../utils.js';
 import { showToast } from '../app.js';
 
 // ---- Module state ----
 let currentWeekStart        = null;
+let stMonthYear             = null;
+let stMonthMonth            = null;
 let pendingSetupScreenshots = [];  // { file, localUrl, uploaded, url? }
 
 const DEFAULT_PAIRS = ['EURUSD', 'GBPUSD'];
@@ -73,6 +76,30 @@ function buildShell() {
       <div class="loading-screen" style="padding:20px"><div class="loading-spinner"></div></div>
     </div>
 
+    <!-- Monthly Overview -->
+    <div class="card" style="margin-bottom:20px;padding:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="card-title" style="font-size:14px">Monthly Overview</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="btn btn-ghost btn-sm" id="st-month-prev">‹</button>
+          <span class="text-muted text-sm" id="st-month-label" style="min-width:120px;text-align:center">Loading...</span>
+          <button class="btn btn-ghost btn-sm" id="st-month-next">›</button>
+        </div>
+      </div>
+      <div id="st-month-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div class="loading-screen" style="padding:12px;grid-column:span 2"><div class="loading-spinner"></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Cumulative R</div>
+          <div style="position:relative;height:160px">
+            <canvas id="st-month-r-chart"></canvas>
+          </div>
+        </div>
+        <div id="st-month-calendar"></div>
+      </div>
+    </div>
+
     <!-- Weekly R chart -->
     <div id="st-chart-section" class="card" style="margin-bottom:20px;padding:20px">
       <div class="loading-screen" style="padding:20px"><div class="loading-spinner"></div></div>
@@ -101,8 +128,11 @@ function buildShell() {
 }
 
 function wireShell() {
-  document.getElementById('st-add-btn').onclick       = () => openSetupModal(null);
+  document.getElementById('st-add-btn').onclick          = () => openSetupModal(null);
   document.getElementById('st-manage-pairs-btn').onclick = openPairModal;
+
+  document.getElementById('st-month-prev').onclick = () => navigateStMonth(-1);
+  document.getElementById('st-month-next').onclick = () => navigateStMonth(1);
 
   document.getElementById('st-week-prev').onclick = () => {
     currentWeekStart = addDays(currentWeekStart, -7);
@@ -129,7 +159,7 @@ function handleEscKey(e) {
 }
 
 async function loadAll() {
-  await Promise.all([loadAllTimeAndChart(), loadWeek()]);
+  await Promise.all([loadAllTimeAndChart(), loadMonthly(), loadWeek()]);
 }
 
 async function loadAllTimeAndChart() {
@@ -146,6 +176,197 @@ async function loadAllTimeAndChart() {
     if (statsEl) statsEl.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
     if (chartEl) chartEl.innerHTML = `<p class="text-loss text-sm" style="padding:20px">${err.message}</p>`;
   }
+}
+
+// =============================================
+//  MONTHLY OVERVIEW
+// =============================================
+function calcSetupR(setup) {
+  if (!setup.outcome || setup.outcome === 'pending') return null;
+  if (setup.outcome === 'win')       return parseFloat(setup.possible_r) || 0;
+  if (setup.outcome === 'loss')      return -1;
+  if (setup.outcome === 'breakeven') return 0;
+  return null;
+}
+
+async function loadMonthly() {
+  const now = new Date();
+  if (stMonthYear  === null) stMonthYear  = now.getFullYear();
+  if (stMonthMonth === null) stMonthMonth = now.getMonth() + 1;
+
+  const monthLabel = new Date(stMonthYear, stMonthMonth - 1, 1)
+    .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const labelEl = document.getElementById('st-month-label');
+  if (labelEl) labelEl.textContent = monthLabel;
+
+  try {
+    const { start, end } = getMonthRange(stMonthYear, stMonthMonth);
+    const setups = await getStrategySetups({ startDate: start, endDate: end });
+
+    const closed  = setups.filter(s => s.outcome && s.outcome !== 'pending');
+    const wins    = closed.filter(s => s.outcome === 'win');
+    const losses  = closed.filter(s => s.outcome === 'loss');
+    const totalR  = parseFloat((wins.reduce((s, x) => s + (parseFloat(x.possible_r) || 0), 0) - losses.length).toFixed(2));
+    const winRate = closed.length ? (wins.length / closed.length * 100) : 0;
+
+    const rColor = totalR >= 0 ? 'profit' : 'loss';
+    const rSign  = totalR >= 0 ? '+' : '';
+
+    const statsEl = document.getElementById('st-month-stats');
+    if (statsEl) statsEl.innerHTML = `
+      <div class="stat-card ${closed.length ? rColor : ''}">
+        <div class="stat-label">Month R</div>
+        <div class="stat-value ${closed.length ? rColor : 'neutral'}">${closed.length ? rSign + totalR.toFixed(2) + 'R' : '—'}</div>
+        <div class="stat-sub">${wins.length}W / ${losses.length}L · ${closed.length} closed</div>
+      </div>
+      <div class="stat-card ${winRate >= 50 && closed.length ? 'profit' : ''}">
+        <div class="stat-label">Month Win Rate</div>
+        <div class="stat-value neutral">${closed.length ? winRate.toFixed(1) + '%' : '—'}</div>
+        <div class="stat-sub">${closed.length} setup${closed.length !== 1 ? 's' : ''} closed</div>
+      </div>
+    `;
+
+    renderStMonthRChart(setups);
+    renderStMonthCalendar(setups, stMonthYear, stMonthMonth);
+  } catch (err) {
+    const statsEl = document.getElementById('st-month-stats');
+    if (statsEl) statsEl.innerHTML = `<p class="text-loss text-sm" style="grid-column:span 2">${err.message}</p>`;
+  }
+}
+
+async function navigateStMonth(delta) {
+  let m = stMonthMonth + delta;
+  let y = stMonthYear;
+  if (m < 1)  { m = 12; y--; }
+  if (m > 12) { m = 1;  y++; }
+  stMonthYear  = y;
+  stMonthMonth = m;
+  await loadMonthly();
+}
+
+function renderStMonthRChart(setups) {
+  const canvas = document.getElementById('st-month-r-chart');
+  if (!canvas) return;
+  if (canvas._chart) { canvas._chart.destroy(); canvas._chart = null; }
+
+  const closed = setups
+    .filter(s => s.outcome && s.outcome !== 'pending')
+    .sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : (a.created_at || '').localeCompare(b.created_at || ''));
+
+  let existing = canvas.parentElement.querySelector('.st-month-chart-empty');
+
+  if (!closed.length) {
+    canvas.style.display = 'none';
+    if (!existing) {
+      existing = document.createElement('div');
+      existing.className = 'st-month-chart-empty';
+      existing.style.cssText = 'display:flex;align-items:center;justify-content:center;height:160px';
+      existing.innerHTML = '<p class="text-muted text-sm">No closed setups this month</p>';
+      canvas.parentElement.appendChild(existing);
+    }
+    return;
+  }
+
+  canvas.style.display = '';
+  if (existing) existing.remove();
+
+  let cumR = 0;
+  const labels = [];
+  const data   = [];
+  closed.forEach(s => {
+    const r = calcSetupR(s);
+    if (r !== null) {
+      cumR = parseFloat((cumR + r).toFixed(2));
+      labels.push(s.date);
+      data.push(cumR);
+    }
+  });
+
+  const isProfit = cumR >= 0;
+  const color    = isProfit ? '#00d97e' : '#ff4757';
+
+  canvas._chart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: color,
+        borderWidth: 2,
+        fill: true,
+        backgroundColor: (ctx) => {
+          const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
+          g.addColorStop(0, isProfit ? 'rgba(0,217,126,0.25)' : 'rgba(255,71,87,0.25)');
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          return g;
+        },
+        tension: 0.4,
+        pointRadius: data.length > 15 ? 0 : 3,
+        pointHoverRadius: 5,
+        pointBackgroundColor: color,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}R cumulative`
+          }
+        }
+      },
+      scales: {
+        x: { display: false },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#8892a4', font: { size: 10 }, callback: v => `${v}R` }
+        }
+      }
+    }
+  });
+}
+
+function renderStMonthCalendar(setups, year, month) {
+  const el = document.getElementById('st-month-calendar');
+  if (!el) return;
+
+  const rByDate = {};
+  setups.forEach(s => {
+    if (!s.date || !s.outcome || s.outcome === 'pending') return;
+    const r = calcSetupR(s);
+    if (r === null) return;
+    if (!rByDate[s.date]) rByDate[s.date] = 0;
+    rByDate[s.date] = parseFloat((rByDate[s.date] + r).toFixed(2));
+  });
+
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay    = new Date(year, month - 1, 1).getDay();
+  const startOffset = (firstDay + 6) % 7;
+  const today       = todayString();
+
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let html = `<div class="pnl-calendar">`;
+  dayNames.forEach(d => html += `<div class="cal-header">${d}</div>`);
+  for (let i = 0; i < startOffset; i++) html += `<div class="cal-day empty"></div>`;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const r       = rByDate[dateStr];
+    const isToday = dateStr === today;
+    const cls     = r !== undefined ? (r > 0 ? 'profit' : r < 0 ? 'loss' : 'breakeven') : 'no-trades';
+    const rLabel  = r !== undefined
+      ? `<div class="cal-day-pnl">${r >= 0 ? '+' : ''}${r.toFixed(1)}R</div>`
+      : '';
+
+    html += `<div class="cal-day ${cls} ${isToday ? 'today' : ''}" title="${dateStr}${r !== undefined ? ': ' + (r >= 0 ? '+' : '') + r + 'R' : ''}">
+      <div class="cal-day-num">${day}</div>${rLabel}
+    </div>`;
+  }
+
+  html += `</div>`;
+  el.innerHTML = html;
 }
 
 // =============================================
