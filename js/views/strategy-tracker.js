@@ -900,6 +900,7 @@ function openSetupModal(setup = null) {
 
   // Show modal
   document.getElementById('st-modal').classList.remove('hidden');
+  document.querySelector('#st-modal .modal-body')?.scrollTo(0, 0);
 
   // Re-wire direction buttons
   document.querySelectorAll('.st-dir-btn').forEach(btn => {

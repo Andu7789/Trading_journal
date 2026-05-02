@@ -338,6 +338,59 @@ export async function deleteNote(id) {
 }
 
 // =============================================
+//  WATCHLIST IDEAS
+// =============================================
+
+export async function getWatchlistIdeas(filters = {}) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  let query = _client
+    .from('watchlist_ideas')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (filters.pair)   query = query.eq('pair', filters.pair);
+  if (filters.status) query = query.eq('status', filters.status);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveWatchlistIdea(ideaData) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  const { id, ...data } = ideaData;
+  data.updated_at = new Date().toISOString();
+
+  if (id) {
+    const { data: result, error } = await _client
+      .from('watchlist_ideas')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
+  } else {
+    const { data: result, error } = await _client
+      .from('watchlist_ideas')
+      .insert(data)
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
+  }
+}
+
+export async function deleteWatchlistIdea(id) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { error } = await _client.from('watchlist_ideas').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// =============================================
 //  PLAYBOOK
 // =============================================
 

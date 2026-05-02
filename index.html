@@ -58,6 +58,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           <span>Strategy Tracker</span>
         </a>
+        <a href="#watchlist" class="nav-item" data-view="watchlist">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>Watchlist</span>
+        </a>
         <a href="#notes" class="nav-item" data-view="notes">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           <span>Notes</span>
@@ -493,6 +497,131 @@
             <button class="btn btn-primary btn-sm" id="st-pair-add-btn">Add</button>
           </div>
           <p class="text-xs text-muted" style="margin-top:12px">Pairs are stored locally in your browser.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== WATCHLIST IDEA MODAL ===== -->
+    <div id="wl-modal" class="modal hidden">
+      <div class="modal-backdrop" id="wl-modal-backdrop"></div>
+      <div class="modal-dialog" style="width:min(520px,95vw)">
+        <div class="modal-header">
+          <h2 id="wl-modal-title">Add Idea</h2>
+          <button class="modal-close" id="wl-modal-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="wl-idea-id">
+          <div class="form-grid-2" style="margin-bottom:16px">
+            <div class="form-group">
+              <label class="form-label">Date</label>
+              <input type="date" id="wl-date" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pair</label>
+              <select id="wl-pair" class="form-input"></select>
+            </div>
+          </div>
+          <div class="form-grid-2" style="margin-bottom:16px">
+            <div class="form-group">
+              <label class="form-label">Direction</label>
+              <div class="direction-toggle" style="margin-top:4px">
+                <button type="button" class="wl-dir-btn dir-btn" data-dir="long">▲ LONG</button>
+                <button type="button" class="wl-dir-btn dir-btn" data-dir="short">▼ SHORT</button>
+              </div>
+              <input type="hidden" id="wl-direction" value="">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">
+                Trade Type
+                <a href="#" id="wl-manage-types-link" class="text-xs" style="color:var(--primary);text-decoration:none">Manage</a>
+              </label>
+              <select id="wl-trade-type" class="form-input">
+                <option value="">Select type...</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">Signal Confluence</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button type="button" class="signal-toggle wl-signal-toggle" data-signal="Dollar">Dollar</button>
+              <button type="button" class="signal-toggle wl-signal-toggle" data-signal="DXY">DXY</button>
+              <button type="button" class="signal-toggle wl-signal-toggle" data-signal="EURUSD">EUR/USD</button>
+              <button type="button" class="signal-toggle wl-signal-toggle" data-signal="GBPUSD">GBP/USD</button>
+              <button type="button" class="signal-toggle" id="wl-signal-all" style="margin-left:4px;opacity:0.7">All</button>
+            </div>
+            <div class="form-hint" id="wl-signal-score">Score: 0 / 4</div>
+          </div>
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">Status</label>
+            <select id="wl-status" class="form-input">
+              <option value="watching">Watching</option>
+              <option value="taken">Taken</option>
+              <option value="passed">Passed</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">Notes</label>
+            <textarea id="wl-notes" class="form-input" rows="3" placeholder="What are you watching for? Entry criteria, key levels..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Screenshots</label>
+            <div id="wl-screenshot-zone" class="screenshot-zone">
+              <div id="wl-upload-prompt" class="upload-prompt">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>Click or drag to add screenshots</span>
+              </div>
+              <div id="wl-screenshot-previews" class="screenshot-previews"></div>
+            </div>
+            <input type="file" id="wl-screenshot-input" accept="image/*" multiple style="display:none">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="wl-modal-cancel">Cancel</button>
+          <button class="btn btn-primary" id="wl-modal-save">Save Idea</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== WATCHLIST MANAGE PAIRS MODAL ===== -->
+    <div id="wl-pair-modal" class="modal hidden">
+      <div class="modal-backdrop" id="wl-pair-modal-backdrop"></div>
+      <div class="modal-dialog" style="width:min(380px,95vw)">
+        <div class="modal-header">
+          <h2>Manage Pairs</h2>
+          <button class="modal-close" id="wl-pair-modal-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="wl-pair-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="wl-new-pair-input" class="form-input" placeholder="e.g. USDJPY" style="flex:1">
+            <button class="btn btn-primary btn-sm" id="wl-pair-add-btn">Add</button>
+          </div>
+          <p class="text-xs text-muted" style="margin-top:12px">Pairs are stored locally in your browser.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== WATCHLIST MANAGE TRADE TYPES MODAL ===== -->
+    <div id="wl-type-modal" class="modal hidden">
+      <div class="modal-backdrop" id="wl-type-modal-backdrop"></div>
+      <div class="modal-dialog" style="width:min(380px,95vw)">
+        <div class="modal-header">
+          <h2>Manage Trade Types</h2>
+          <button class="modal-close" id="wl-type-modal-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="wl-type-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="wl-new-type-input" class="form-input" placeholder="e.g. Breakout, Reversal..." style="flex:1">
+            <button class="btn btn-primary btn-sm" id="wl-type-add-btn">Add</button>
+          </div>
+          <p class="text-xs text-muted" style="margin-top:12px">Trade types are stored locally in your browser.</p>
         </div>
       </div>
     </div>
