@@ -334,10 +334,8 @@ function openIdeaModal(idea = null) {
     btn.onclick = () => { btn.classList.toggle('active'); _updateSignalScore(); };
   });
 
-  document.getElementById('wl-manage-types-link')?.onclick = (e) => {
-    e.preventDefault();
-    openTypeModal();
-  };
+  const typesLink = document.getElementById('wl-manage-types-link');
+  if (typesLink) typesLink.onclick = (e) => { e.preventDefault(); openTypeModal(); };
 }
 
 function closeIdeaModal() {
