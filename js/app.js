@@ -212,6 +212,18 @@ async function navigate(view, params = {}) {
   };
   document.getElementById('page-title').textContent = titles[view] || view;
 
+  // Topbar action button — contextual per view
+  const topbarBtn = document.getElementById('add-trade-btn');
+  if (topbarBtn) {
+    if (view === 'strategy-tracker') {
+      topbarBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Setup`;
+      topbarBtn.onclick = () => window._stOpenAddModal?.();
+    } else {
+      topbarBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Trade`;
+      topbarBtn.onclick = () => openTradeModal(null, null);
+    }
+  }
+
   // Check connection (skip for settings)
   if (view !== 'settings' && !isConnected()) {
     renderSetupScreen();
