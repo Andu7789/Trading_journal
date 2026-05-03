@@ -92,7 +92,8 @@ export function addDays(dateStr, n) {
 
 export function getMonthRange(year, month) {
   const start = `${year}-${String(month).padStart(2,'0')}-01`;
-  const end   = new Date(year, month, 0).toISOString().split('T')[0];
+  const d = new Date(year, month, 0); // last day of month, local time
+  const end = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   return { start, end };
 }
 
