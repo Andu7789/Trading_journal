@@ -178,13 +178,15 @@ function buildDashboard(today, todayTrades, todayStats, monthTrades, monthStats,
           <div id="pnl-calendar"></div>
         </div>
 
-        <!-- Today's Journal Snapshot -->
+        <!-- P&L by Week -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Today's Journal</div>
-            <a href="#journal" class="btn btn-ghost btn-sm">Open Journal</a>
+            <div class="card-title">P&amp;L by Week</div>
+            <span class="text-muted text-sm" id="week-bar-label">${monthLabel}</span>
           </div>
-          ${buildJournalSnapshot(journalEntry, todayTrades)}
+          <div style="position:relative;height:180px">
+            <canvas id="dash-week-bar"></canvas>
+          </div>
         </div>
 
       </div>
@@ -222,6 +224,7 @@ function buildJournalSnapshot(entry, trades) {
 function initDashboard(today, todayTrades, monthTrades) {
   renderCalendar(monthTrades, today, dashYear, dashMonth);
   renderEquityChart(monthTrades);
+  renderDashWeekBar(monthTrades, dashYear, dashMonth);
   window._openTradeModal = (id) => openTradeModal(id, today);
 
   document.getElementById('cal-prev')?.addEventListener('click', () => navigateDashMonth(-1, today));
@@ -252,6 +255,10 @@ async function navigateDashMonth(delta, today) {
     if (statCards) statCards.innerHTML = buildMonthStatCards(monthStats);
 
     renderEquityChart(monthTrades);
+    renderDashWeekBar(monthTrades, y, m);
+
+    const weekBarLabel = document.getElementById('week-bar-label');
+    if (weekBarLabel) weekBarLabel.textContent = monthLabel;
 
     const recentEl = document.getElementById('recent-trades-content');
     if (recentEl) recentEl.innerHTML = buildRecentTradesContent(monthTrades);
@@ -366,6 +373,99 @@ window._showDayTrades = async function(dateStr) {
     bodyEl.innerHTML = `<div class="empty-state"><p class="text-loss">${err.message}</p></div>`;
   }
 };
+
+function renderDashWeekBar(trades, year, month) {
+  const canvas = document.getElementById('dash-week-bar');
+  if (!canvas) return;
+  if (canvas._chart) { canvas._chart.destroy(); canvas._chart = null; }
+
+  const pad   = n => String(n).padStart(2, '0');
+  const toStr = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+
+  const monthStart = `${year}-${pad(month)}-01`;
+  const lastD      = new Date(year, month, 0);
+  const monthEnd   = toStr(lastD);
+
+  const first    = new Date(year, month - 1, 1);
+  const dow      = first.getDay();
+  const backToMon = dow === 0 ? 6 : dow - 1;
+  const firstMon = new Date(first);
+  firstMon.setDate(firstMon.getDate() - backToMon);
+
+  const weeks = [];
+  const cur   = new Date(firstMon);
+  while (toStr(cur) <= monthEnd) {
+    const wStart = toStr(cur);
+    const wEnd   = toStr(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 6));
+
+    if (wEnd >= monthStart) {
+      const label  = cur.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const bucket = trades.filter(t => t.date >= wStart && t.date <= wEnd);
+      const pnl    = parseFloat(bucket.reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0).toFixed(2));
+      weeks.push({ label, pnl, count: bucket.length });
+    }
+
+    cur.setDate(cur.getDate() + 7);
+  }
+
+  canvas.style.display = '';
+  canvas.parentElement.querySelector('.dash-week-empty')?.remove();
+
+  if (weeks.every(w => w.count === 0)) {
+    canvas.style.display = 'none';
+    const msg = document.createElement('div');
+    msg.className = 'dash-week-empty empty-state';
+    msg.innerHTML = '<p class="text-muted text-sm">No trades this month</p>';
+    canvas.parentElement.appendChild(msg);
+    return;
+  }
+
+  const colors  = weeks.map(w => w.pnl >= 0 ? 'rgba(0,217,126,0.75)' : 'rgba(255,71,87,0.75)');
+  const borders = weeks.map(w => w.pnl >= 0 ? '#00d97e' : '#ff4757');
+
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: weeks.map(w => w.label),
+      datasets: [{
+        data:            weeks.map(w => w.pnl),
+        backgroundColor: colors,
+        borderColor:     borders,
+        borderWidth:     1,
+        borderRadius:    4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f1c30',
+          borderColor: '#1e3558',
+          borderWidth: 1,
+          callbacks: {
+            label: ctx => ` ${formatCurrency(ctx.parsed.y)}  (${weeks[ctx.dataIndex].count} trade${weeks[ctx.dataIndex].count !== 1 ? 's' : ''})`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#4a6080', font: { family: 'JetBrains Mono', size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(30,53,88,0.5)' },
+          ticks: {
+            color: '#4a6080',
+            font: { family: 'JetBrains Mono', size: 10 },
+            callback: v => formatCurrency(v, 0)
+          }
+        }
+      }
+    }
+  });
+}
 
 function renderEquityChart(trades) {
   const canvas = document.getElementById('equity-chart');

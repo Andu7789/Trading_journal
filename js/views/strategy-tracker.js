@@ -93,6 +93,12 @@ function buildShell() {
         </div>
         <div id="st-month-calendar"></div>
       </div>
+      <div style="margin-top:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">R by Week</div>
+        <div style="position:relative;height:120px">
+          <canvas id="st-month-week-bar"></canvas>
+        </div>
+      </div>
     </div>
 
     <!-- Weekly R chart -->
@@ -222,6 +228,7 @@ async function loadMonthly() {
     `;
 
     renderStMonthRChart(setups);
+    renderStMonthWeekBar(setups, stMonthYear, stMonthMonth);
     renderStMonthCalendar(setups, stMonthYear, stMonthMonth);
   } catch (err) {
     const statsEl = document.getElementById('st-month-stats');
@@ -317,6 +324,88 @@ function renderStMonthRChart(setups) {
         y: {
           grid: { color: 'rgba(255,255,255,0.05)' },
           ticks: { color: '#8892a4', font: { size: 10 }, callback: v => `${v}R` }
+        }
+      }
+    }
+  });
+}
+
+function renderStMonthWeekBar(setups, year, month) {
+  const canvas = document.getElementById('st-month-week-bar');
+  if (!canvas) return;
+  if (canvas._chart) { canvas._chart.destroy(); canvas._chart = null; }
+
+  const pad = n => String(n).padStart(2, '0');
+  const toStr = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+
+  const monthStart = `${year}-${pad(month)}-01`;
+  const lastD      = new Date(year, month, 0);
+  const monthEnd   = toStr(lastD);
+
+  // Find first Monday on or before the 1st of the month
+  const first     = new Date(year, month - 1, 1);
+  const dow        = first.getDay(); // 0=Sun
+  const backToMon  = dow === 0 ? 6 : dow - 1;
+  const firstMon   = new Date(first);
+  firstMon.setDate(firstMon.getDate() - backToMon);
+
+  const weeks = [];
+  const cur   = new Date(firstMon);
+  while (toStr(cur) <= monthEnd) {
+    const wStart = toStr(cur);
+    const wEnd   = toStr(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 6));
+
+    if (wEnd >= monthStart) {
+      const label   = cur.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const bucket  = setups.filter(s => s.date >= wStart && s.date <= wEnd && s.outcome && s.outcome !== 'pending');
+      const r       = parseFloat(bucket.reduce((sum, s) => sum + (calcSetupR(s) ?? 0), 0).toFixed(2));
+      weeks.push({ label, r, count: bucket.length });
+    }
+
+    cur.setDate(cur.getDate() + 7);
+  }
+
+  const hasData = weeks.some(w => w.count > 0);
+  canvas.style.display = hasData ? '' : 'none';
+  if (!hasData) return;
+
+  const colors  = weeks.map(w => w.r >= 0 ? 'rgba(0,217,126,0.75)' : 'rgba(255,71,87,0.75)');
+  const borders = weeks.map(w => w.r >= 0 ? '#00d97e' : '#ff4757');
+
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: weeks.map(w => w.label),
+      datasets: [{
+        data:            weeks.map(w => w.r),
+        backgroundColor: colors,
+        borderColor:     borders,
+        borderWidth:     1,
+        borderRadius:    4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f1c30',
+          borderColor: '#1e3558',
+          borderWidth: 1,
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}R  (${weeks[ctx.dataIndex].count} setup${weeks[ctx.dataIndex].count !== 1 ? 's' : ''})`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#8892a4', font: { size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#8892a4', font: { size: 10 }, callback: v => `${v >= 0 ? '+' : ''}${v}R` }
         }
       }
     }
