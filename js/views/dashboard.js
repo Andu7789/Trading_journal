@@ -307,7 +307,7 @@ function renderCalendar(trades, today, year = new Date().getFullYear(), month = 
     }
 
     html += `
-      <div class="cal-day ${cls} ${isToday ? 'today' : ''}" title="${dateStr}: ${pnl !== undefined ? formatCurrency(pnl) : 'No trades'}${rByDate[dateStr] !== undefined ? ' / ' + formatR(rByDate[dateStr]) : ''}">
+      <div class="cal-day ${cls} ${isToday ? 'today' : ''}" style="cursor:pointer" title="${dateStr}: ${pnl !== undefined ? formatCurrency(pnl) : 'No trades'}${rByDate[dateStr] !== undefined ? ' / ' + formatR(rByDate[dateStr]) : ''}" onclick="window._showDayTrades('${dateStr}')">
         <div class="cal-day-num">${day}</div>
         ${pnlLabel}${rLabel}
       </div>`;
@@ -316,6 +316,56 @@ function renderCalendar(trades, today, year = new Date().getFullYear(), month = 
   html += `</div>`;
   el.innerHTML = html;
 }
+
+window._showDayTrades = async function(dateStr) {
+  const modal    = document.getElementById('day-modal');
+  const titleEl  = document.getElementById('day-modal-title');
+  const bodyEl   = document.getElementById('day-modal-body');
+  if (!modal) return;
+
+  const label = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  titleEl.textContent = label;
+  bodyEl.innerHTML = '<div class="loading-screen" style="min-height:80px"><div class="loading-spinner"></div></div>';
+  modal.classList.remove('hidden');
+
+  try {
+    const trades = await getTrades({ date: dateStr });
+    if (!trades.length) {
+      bodyEl.innerHTML = '<div class="empty-state" style="padding:32px"><p class="text-muted">No trades on this day.</p></div>';
+      return;
+    }
+    const dayStats = calcStats(trades);
+    bodyEl.innerHTML = `
+      <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+        <span class="td-mono ${pnlClass(dayStats.totalPnl)}" style="font-weight:700;font-size:1.1em">${pnlSign(dayStats.totalPnl)}${formatCurrency(dayStats.totalPnl)}</span>
+        ${dayStats.tradesWithR ? `<span class="td-mono ${dayStats.totalR >= 0 ? 'text-profit' : 'text-loss'}" style="font-weight:700;font-size:1.1em">${formatR(dayStats.totalR)}</span>` : ''}
+        <span class="text-muted">${dayStats.wins}W / ${dayStats.losses}L · ${dayStats.winRate.toFixed(0)}% WR · ${trades.length} trade${trades.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Symbol</th><th>Dir</th><th>P&amp;L</th><th>R</th><th>Outcome</th><th>Strategy</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            ${trades.map(t => {
+              const r = calcTradeR(t);
+              return `<tr style="cursor:pointer" onclick="window._openTradeModal('${t.id}');document.getElementById('day-modal').classList.add('hidden')">
+                <td><strong>${t.symbol}</strong></td>
+                <td>${getDirectionBadge(t.direction)}</td>
+                <td class="td-mono ${pnlClass(t.pnl)}">${pnlSign(t.pnl)}${formatCurrency(t.pnl)}</td>
+                <td class="td-mono ${r !== null ? pnlClass(r) : ''}">${formatR(r)}</td>
+                <td>${getOutcomeBadge(t.outcome, t.trade_type)}</td>
+                <td class="text-muted text-sm">${t.strategy || '—'}</td>
+                <td class="text-muted text-sm" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.notes || '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch (err) {
+    bodyEl.innerHTML = `<div class="empty-state"><p class="text-loss">${err.message}</p></div>`;
+  }
+};
 
 function renderEquityChart(trades) {
   const canvas = document.getElementById('equity-chart');

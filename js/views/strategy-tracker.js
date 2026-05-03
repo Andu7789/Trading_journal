@@ -4,7 +4,8 @@
 import { getStrategySetups, saveStrategySetup, deleteStrategySetup, uploadScreenshot } from '../db.js';
 import { todayString, getWeekRange, getMonthRange, getDaysInMonth,
          addDays, formatDate, formatDateShort,
-         escapeHtml, nl2br, getSignalDisplay } from '../utils.js';
+         escapeHtml, nl2br, getSignalDisplay,
+         getOutcomeBadge, getDirectionBadge } from '../utils.js';
 import { showToast } from '../app.js';
 
 // ---- Module state ----
@@ -354,7 +355,7 @@ function renderStMonthCalendar(setups, year, month) {
       ? `<div class="cal-day-pnl">${r >= 0 ? '+' : ''}${r.toFixed(1)}R</div>`
       : '';
 
-    html += `<div class="cal-day ${cls} ${isToday ? 'today' : ''}" title="${dateStr}${r !== undefined ? ': ' + (r >= 0 ? '+' : '') + r + 'R' : ''}">
+    html += `<div class="cal-day ${cls} ${isToday ? 'today' : ''}" style="cursor:pointer" title="${dateStr}${r !== undefined ? ': ' + (r >= 0 ? '+' : '') + r + 'R' : ''}" onclick="window._showDaySetups('${dateStr}')">
       <div class="cal-day-num">${day}</div>${rLabel}
     </div>`;
   }
@@ -362,6 +363,63 @@ function renderStMonthCalendar(setups, year, month) {
   html += `</div>`;
   el.innerHTML = html;
 }
+
+window._showDaySetups = async function(dateStr) {
+  const modal   = document.getElementById('day-modal');
+  const titleEl = document.getElementById('day-modal-title');
+  const bodyEl  = document.getElementById('day-modal-body');
+  if (!modal) return;
+
+  const label = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  titleEl.textContent = label;
+  bodyEl.innerHTML = '<div class="loading-screen" style="min-height:80px"><div class="loading-spinner"></div></div>';
+  modal.classList.remove('hidden');
+
+  try {
+    const setups = await getStrategySetups({ startDate: dateStr, endDate: dateStr });
+    if (!setups.length) {
+      bodyEl.innerHTML = '<div class="empty-state" style="padding:32px"><p class="text-muted">No setups on this day.</p></div>';
+      return;
+    }
+    const closed = setups.filter(s => s.outcome && s.outcome !== 'pending');
+    const wins   = closed.filter(s => s.outcome === 'win').length;
+    const losses = closed.filter(s => s.outcome === 'loss').length;
+    const totalR = closed.reduce((sum, s) => sum + (calcSetupR(s) ?? 0), 0);
+
+    bodyEl.innerHTML = `
+      <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+        ${closed.length ? `<span class="td-mono ${totalR >= 0 ? 'text-profit' : 'text-loss'}" style="font-weight:700;font-size:1.1em">${totalR >= 0 ? '+' : ''}${totalR.toFixed(2)}R</span>` : ''}
+        <span class="text-muted">${wins}W / ${losses}L · ${setups.length} setup${setups.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Pair</th><th>Dir</th><th>Possible R</th><th>Outcome</th><th>Signals</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            ${setups.map((s, i) => `
+              <tr style="cursor:pointer" data-idx="${i}">
+                <td><strong>${s.pair || '—'}</strong></td>
+                <td>${getDirectionBadge(s.direction)}</td>
+                <td class="td-mono">${s.possible_r != null ? s.possible_r + 'R' : '—'}</td>
+                <td>${getOutcomeBadge(s.outcome)}</td>
+                <td class="text-sm text-muted">${getSignalDisplay(s.signals)}</td>
+                <td class="text-muted text-sm" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.notes || '—'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    bodyEl.querySelectorAll('tr[data-idx]').forEach(row => {
+      row.addEventListener('click', () => {
+        modal.classList.add('hidden');
+        openSetupModal(setups[parseInt(row.dataset.idx)]);
+      });
+    });
+  } catch (err) {
+    bodyEl.innerHTML = `<div class="empty-state"><p class="text-loss">${err.message}</p></div>`;
+  }
+};
 
 // =============================================
 //  ALL-TIME STATS + CHART

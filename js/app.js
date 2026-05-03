@@ -816,7 +816,7 @@ function setupImageModal() {
   document.addEventListener('keydown', (e) => {
     const modal = document.getElementById('image-modal');
     const open  = modal && !modal.classList.contains('hidden');
-    if (e.key === 'Escape') { closeTradeModal(); closeImageModal(); closeGalleryGrid(); }
+    if (e.key === 'Escape') { closeTradeModal(); closeImageModal(); closeGalleryGrid(); document.getElementById('day-modal')?.classList.add('hidden'); }
     if (open && e.key === 'ArrowLeft')  { e.preventDefault(); _galleryStep(-1); }
     if (open && e.key === 'ArrowRight') { e.preventDefault(); _galleryStep(1); }
   });
