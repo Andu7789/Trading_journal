@@ -1166,6 +1166,7 @@ function openSetupModal(setup = null) {
         `;
         previews.appendChild(item);
       });
+      updateStModalViewAll();
     }
   } else {
     document.getElementById('st-modal-title').textContent = 'Add Setup';
@@ -1331,8 +1332,20 @@ function wireScreenshotZone() {
     pendingSetupScreenshots[idx] = null;
     const item = document.querySelector(`#st-screenshot-previews .preview-item[data-idx="${idx}"]`);
     if (item) item.remove();
+    updateStModalViewAll();
   };
 }
+
+function updateStModalViewAll() {
+  const count = document.querySelectorAll('#st-screenshot-previews .preview-item img').length;
+  const btn   = document.getElementById('st-modal-view-all');
+  if (btn) btn.style.display = count > 1 ? '' : 'none';
+}
+
+window._openStModalGallery = function() {
+  const urls = Array.from(document.querySelectorAll('#st-screenshot-previews .preview-item img')).map(i => i.src);
+  if (urls.length > 1) window._openGalleryGrid?.(urls);
+};
 
 function addSetupFiles(files) {
   const previews = document.getElementById('st-screenshot-previews');
@@ -1355,6 +1368,7 @@ function addSetupFiles(files) {
       `;
       previews.appendChild(item);
       if (prompt) prompt.style.display = 'none';
+      updateStModalViewAll();
     };
     reader.readAsDataURL(file);
   });

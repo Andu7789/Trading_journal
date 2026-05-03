@@ -817,6 +817,10 @@ select.form-input option {
   flex-shrink: 0;
 }
 
+/* Image viewer always floats above all other modals */
+#image-modal,
+#gallery-grid-modal { z-index: 1100; }
+
 /* Image Modal */
 .image-modal-content {
   position: relative;
