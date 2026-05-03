@@ -884,7 +884,7 @@ window._viewPreview = function(imgEl) {
 // =============================================
 let _gridGalleryUrls = [];
 
-function _openGalleryGrid(urls) {
+window._openGalleryGrid = function _openGalleryGrid(urls) {
   if (!urls.length) return;
   const modal = document.getElementById('gallery-grid-modal');
   const body  = document.getElementById('gallery-grid-body');
@@ -928,14 +928,14 @@ function updateTradeModalViewAll() {
 
 window._openTradeModalGallery = function() {
   const urls = Array.from(document.querySelectorAll('#screenshot-previews .preview-item img')).map(i => i.src);
-  _openGalleryGrid(urls);
+  window._openGalleryGrid(urls);
 };
 
 window._openGalleryFromSection = function(btn) {
   const section = btn.closest('[data-ss-section]');
   if (!section) return;
   const urls = Array.from(section.querySelectorAll('.screenshots-grid img')).map(i => i.src);
-  _openGalleryGrid(urls);
+  window._openGalleryGrid(urls);
 };
 
 // =============================================
