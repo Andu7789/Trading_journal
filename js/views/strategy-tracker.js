@@ -90,14 +90,14 @@ function buildShell() {
           <div style="position:relative;height:160px">
             <canvas id="st-month-r-chart"></canvas>
           </div>
+          <div style="margin-top:16px">
+            <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">R by Week</div>
+            <div style="position:relative;height:120px">
+              <canvas id="st-month-week-bar"></canvas>
+            </div>
+          </div>
         </div>
         <div id="st-month-calendar"></div>
-      </div>
-      <div style="margin-top:16px">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">R by Week</div>
-        <div style="position:relative;height:120px">
-          <canvas id="st-month-week-bar"></canvas>
-        </div>
       </div>
     </div>
 
