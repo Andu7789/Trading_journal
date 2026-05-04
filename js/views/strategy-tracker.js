@@ -84,15 +84,15 @@ function buildShell() {
       <div id="st-month-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
         <div class="loading-screen" style="padding:12px;grid-column:span 2"><div class="loading-spinner"></div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-        <div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch">
+        <div style="display:flex;flex-direction:column">
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Cumulative R</div>
           <div style="position:relative;height:160px">
             <canvas id="st-month-r-chart"></canvas>
           </div>
-          <div style="margin-top:16px">
+          <div style="margin-top:16px;flex:1;display:flex;flex-direction:column">
             <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">R by Week</div>
-            <div style="position:relative;height:120px">
+            <div style="position:relative;flex:1;min-height:120px">
               <canvas id="st-month-week-bar"></canvas>
             </div>
           </div>
