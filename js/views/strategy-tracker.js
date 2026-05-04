@@ -1170,12 +1170,13 @@ function ensureModalsInDom() {
   document.getElementById('st-modal-cancel').onclick    = closeSetupModal;
   document.getElementById('st-modal-save').onclick      = handleSaveSetup;
 
-  document.getElementById('st-signal-all')?.addEventListener('click', () => {
+  const stAllBtn = document.getElementById('st-signal-all');
+  if (stAllBtn) stAllBtn.onclick = () => {
     const btns = document.querySelectorAll('.st-signal-toggle');
     const allActive = Array.from(btns).every(b => b.classList.contains('active'));
     btns.forEach(b => b.classList.toggle('active', !allActive));
     _updateStSignalScore();
-  });
+  };
 
   document.getElementById('st-pair-modal-backdrop').onclick = closePairModal;
   document.getElementById('st-pair-modal-close').onclick    = closePairModal;
