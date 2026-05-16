@@ -454,6 +454,7 @@ function renderStMonthCalendar(setups, year, month) {
 }
 
 window._showDaySetups = async function(dateStr) {
+  _dayModalSortState = { col: null, dir: 'asc' };
   const modal   = document.getElementById('day-modal');
   const titleEl = document.getElementById('day-modal-title');
   const bodyEl  = document.getElementById('day-modal-body');
@@ -465,50 +466,101 @@ window._showDaySetups = async function(dateStr) {
   modal.classList.remove('hidden');
 
   try {
-    const setups = await getStrategySetups({ startDate: dateStr, endDate: dateStr });
-    if (!setups.length) {
+    _dayModalSetups = await getStrategySetups({ startDate: dateStr, endDate: dateStr });
+    if (!_dayModalSetups.length) {
       bodyEl.innerHTML = '<div class="empty-state" style="padding:32px"><p class="text-muted">No setups on this day.</p></div>';
       return;
     }
-    const closed = setups.filter(s => s.outcome && s.outcome !== 'pending');
-    const wins   = closed.filter(s => s.outcome === 'win').length;
-    const losses = closed.filter(s => s.outcome === 'loss').length;
-    const totalR = closed.reduce((sum, s) => sum + (calcSetupR(s) ?? 0), 0);
-
-    bodyEl.innerHTML = `
-      <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
-        ${closed.length ? `<span class="td-mono ${totalR >= 0 ? 'text-profit' : 'text-loss'}" style="font-weight:700;font-size:1.1em">${totalR >= 0 ? '+' : ''}${totalR.toFixed(2)}R</span>` : ''}
-        <span class="text-muted">${wins}W / ${losses}L · ${setups.length} setup${setups.length !== 1 ? 's' : ''}</span>
-      </div>
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr><th>Pair</th><th>Dir</th><th>Possible R</th><th>Outcome</th><th>Signals</th><th>Notes</th></tr>
-          </thead>
-          <tbody>
-            ${setups.map((s, i) => `
-              <tr style="cursor:pointer" data-idx="${i}">
-                <td><strong>${s.pair || '—'}</strong></td>
-                <td>${getDirectionBadge(s.direction)}</td>
-                <td class="td-mono">${s.possible_r != null ? s.possible_r + 'R' : '—'}</td>
-                <td>${getOutcomeBadge(s.outcome)}</td>
-                <td class="text-sm text-muted">${getSignalDisplay(s.signals)}</td>
-                <td class="text-muted text-sm" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.notes || '—'}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-
-    bodyEl.querySelectorAll('tr[data-idx]').forEach(row => {
-      row.addEventListener('click', () => {
-        modal.classList.add('hidden');
-        openSetupModal(setups[parseInt(row.dataset.idx)]);
-      });
-    });
+    _renderDayModalTable(bodyEl);
   } catch (err) {
     bodyEl.innerHTML = `<div class="empty-state"><p class="text-loss">${err.message}</p></div>`;
   }
 };
+
+function _sortedDaySetups() {
+  const { col, dir } = _dayModalSortState;
+  if (!col) return [..._dayModalSetups];
+  return [..._dayModalSetups].sort((a, b) => {
+    let av, bv;
+    if (col === 'pair')    { av = a.pair || '';        bv = b.pair || ''; }
+    if (col === 'dir')     { av = a.direction || '';   bv = b.direction || ''; }
+    if (col === 'r')       { av = parseFloat(a.possible_r) || 0; bv = parseFloat(b.possible_r) || 0; }
+    if (col === 'outcome') { av = a.outcome || '';     bv = b.outcome || ''; }
+    if (col === 'signals') { av = Array.isArray(a.signals) ? a.signals.length : 0; bv = Array.isArray(b.signals) ? b.signals.length : 0; }
+    if (typeof av === 'string') return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    return dir === 'asc' ? av - bv : bv - av;
+  });
+}
+
+function _renderDayModalTable(bodyEl) {
+  const closed = _dayModalSetups.filter(s => s.outcome && s.outcome !== 'pending');
+  const wins   = closed.filter(s => s.outcome === 'win').length;
+  const losses = closed.filter(s => s.outcome === 'loss').length;
+  const totalR = closed.reduce((sum, s) => sum + (calcSetupR(s) ?? 0), 0);
+  const sorted = _sortedDaySetups();
+
+  const sortIcon = col => {
+    if (_dayModalSortState.col !== col) return ' <span style="opacity:0.35;font-size:10px">↕</span>';
+    return _dayModalSortState.dir === 'asc'
+      ? ' <span style="color:var(--accent);font-size:10px">↑</span>'
+      : ' <span style="color:var(--accent);font-size:10px">↓</span>';
+  };
+
+  bodyEl.innerHTML = `
+    <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+      ${closed.length ? `<span class="td-mono ${totalR >= 0 ? 'text-profit' : 'text-loss'}" style="font-weight:700;font-size:1.1em">${totalR >= 0 ? '+' : ''}${totalR.toFixed(2)}R</span>` : ''}
+      <span class="text-muted">${wins}W / ${losses}L · ${_dayModalSetups.length} setup${_dayModalSetups.length !== 1 ? 's' : ''}</span>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th data-sort-col="pair"    style="cursor:pointer;user-select:none">Pair${sortIcon('pair')}</th>
+            <th data-sort-col="dir"     style="cursor:pointer;user-select:none">Dir${sortIcon('dir')}</th>
+            <th data-sort-col="r"       style="cursor:pointer;user-select:none">Possible R${sortIcon('r')}</th>
+            <th data-sort-col="outcome" style="cursor:pointer;user-select:none">Outcome${sortIcon('outcome')}</th>
+            <th data-sort-col="signals" style="cursor:pointer;user-select:none">Signals${sortIcon('signals')}</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sorted.map(s => `
+            <tr style="cursor:pointer" data-id="${s.id}">
+              <td><strong>${s.pair || '—'}</strong></td>
+              <td>${getDirectionBadge(s.direction)}</td>
+              <td class="td-mono">${s.possible_r != null ? s.possible_r + 'R' : '—'}</td>
+              <td>${getOutcomeBadge(s.outcome)}</td>
+              <td class="text-sm text-muted">${getSignalDisplay(s.signals)}</td>
+              <td class="text-muted text-sm" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.notes || '—'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  const modal = document.getElementById('day-modal');
+  bodyEl.querySelectorAll('th[data-sort-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sortCol;
+      if (_dayModalSortState.col === col) {
+        _dayModalSortState.dir = _dayModalSortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _dayModalSortState.col = col;
+        _dayModalSortState.dir = 'asc';
+      }
+      _renderDayModalTable(bodyEl);
+    });
+  });
+
+  bodyEl.querySelectorAll('tr[data-id]').forEach(row => {
+    row.addEventListener('click', () => {
+      const setup = _dayModalSetups.find(s => s.id === row.dataset.id);
+      if (setup) {
+        modal.classList.add('hidden');
+        openSetupModal(setup);
+      }
+    });
+  });
+}
 
 // =============================================
 //  ALL-TIME STATS + CHART
@@ -823,7 +875,11 @@ function _drawPairChart(setups) {
 // =============================================
 const ST_SIGNALS     = ['Dollar', 'DXY', 'EURUSD', 'GBPUSD'];
 const ST_SIG_LABELS  = { Dollar: 'Dollar', DXY: 'DXY', EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD' };
-let _stConfByScore   = { 0: [], 1: [], 2: [], 3: [], 4: [] };
+const ST_SIG_SHORT   = { Dollar: 'DLR', DXY: 'DXY', EURUSD: 'EUR', GBPUSD: 'GBP' };
+let _stConfByCombination = {};
+let _stConfCombos        = [];
+let _dayModalSetups      = [];
+let _dayModalSortState   = { col: null, dir: 'asc' };
 
 function renderStConfluence(allSetups) {
   const el = document.getElementById('st-confluence-section');
@@ -832,26 +888,36 @@ function renderStConfluence(allSetups) {
   const closed = allSetups.filter(s => s.outcome === 'win' || s.outcome === 'loss' || s.outcome === 'breakeven');
   if (!closed.length) { el.innerHTML = ''; return; }
 
+  // Group by exact signal combination (canonical sorted key)
+  _stConfByCombination = {};
+  closed.forEach(s => {
+    const sigs = Array.isArray(s.signals) ? [...s.signals].sort() : [];
+    const key  = sigs.length ? sigs.join('+') : '__none__';
+    if (!_stConfByCombination[key]) _stConfByCombination[key] = { signals: sigs, setups: [] };
+    _stConfByCombination[key].setups.push(s);
+  });
+
+  // Sort by total R descending
+  _stConfCombos = Object.entries(_stConfByCombination)
+    .sort((a, b) => _calcR(b[1].setups) - _calcR(a[1].setups));
+
+  const chartHeight = Math.max(220, _stConfCombos.length * 38);
+
   el.innerHTML = `
     <div class="card" style="padding:20px">
       <div class="card-title" style="font-size:14px;margin-bottom:4px">Signal Confluence Analysis</div>
-      <div class="card-subtitle" style="margin-bottom:16px">Setup performance by number of confirmed swing-point signals (0–4)</div>
-      <div style="position:relative;height:220px"><canvas id="st-confluence-chart"></canvas></div>
+      <div class="card-subtitle" style="margin-bottom:16px">Performance by exact signal combination — click a bar or row to drill down</div>
+      <div style="position:relative;height:${chartHeight}px"><canvas id="st-confluence-chart"></canvas></div>
       <div id="st-confluence-table" style="margin-top:20px"></div>
     </div>
   `;
 
-  _stConfByScore = { 0: [], 1: [], 2: [], 3: [], 4: [] };
-  closed.forEach(s => {
-    const score = Array.isArray(s.signals) ? s.signals.length : 0;
-    if (score in _stConfByScore) _stConfByScore[score].push(s);
-  });
-  const byScore = _stConfByScore;
-
-  const labels    = ['0 / 4', '1 / 4', '2 / 4', '3 / 4', '4 / 4'];
-  const rValues   = [0,1,2,3,4].map(sc => _calcR(byScore[sc]));
-  const winRates  = [0,1,2,3,4].map(sc => byScore[sc].length ? _winRate(byScore[sc]) : null);
-  const barColors = ['rgba(255,71,87,0.6)','rgba(255,140,0,0.6)','rgba(255,165,2,0.6)','rgba(76,217,100,0.6)','rgba(0,230,118,0.7)'];
+  const labels   = _stConfCombos.map(([key, {signals}]) =>
+    key === '__none__' ? 'None' : signals.map(s => ST_SIG_SHORT[s] || s).join('+'));
+  const rValues  = _stConfCombos.map(([, {setups}]) => _calcR(setups));
+  const winRates = _stConfCombos.map(([, {setups}]) => setups.length ? _winRate(setups) : null);
+  const barColors = rValues.map(v => v >= 0 ? 'rgba(0,217,126,0.75)' : 'rgba(255,71,87,0.75)');
+  const borders   = rValues.map(v => v >= 0 ? '#00d97e' : '#ff4757');
 
   const canvas = document.getElementById('st-confluence-chart');
   if (canvas._chart) canvas._chart.destroy();
@@ -860,7 +926,7 @@ function renderStConfluence(allSetups) {
     data: {
       labels,
       datasets: [
-        { label: 'Total R', data: rValues, backgroundColor: rValues.map((v, i) => barColors[i]), borderWidth: 0, yAxisID: 'y' },
+        { label: 'Total R', data: rValues, backgroundColor: barColors, borderColor: borders, borderWidth: 1, borderRadius: 4, yAxisID: 'y' },
         { label: 'Win Rate %', data: winRates, type: 'line', borderColor: '#3d7ef0', borderWidth: 2,
           pointRadius: 5, pointBackgroundColor: '#3d7ef0', yAxisID: 'y2', tension: 0, spanGaps: true }
       ]
@@ -874,7 +940,17 @@ function renderStConfluence(allSetups) {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: true, labels: { color: '#94a3b8', font: { size: 11 } } },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Win Rate %' ? `${ctx.parsed.y}%` : `${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}R` } }
+        tooltip: {
+          callbacks: {
+            title: ctx => {
+              const [key, {signals}] = _stConfCombos[ctx[0].dataIndex];
+              return key === '__none__' ? 'No Signals' : signals.map(s => ST_SIG_LABELS[s] || s).join(' + ');
+            },
+            label: ctx => ctx.dataset.label === 'Win Rate %'
+              ? `${ctx.parsed.y}%`
+              : `${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}R`
+          }
+        }
       },
       scales: {
         x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
@@ -884,73 +960,49 @@ function renderStConfluence(allSetups) {
     }
   });
 
-  const instStats = ST_SIGNALS.map(inst => {
-    const withInst    = closed.filter(s => Array.isArray(s.signals) && s.signals.includes(inst));
-    const withoutInst = closed.filter(s => !Array.isArray(s.signals) || !s.signals.includes(inst));
-    const wrWith    = withInst.length    ? _winRate(withInst).toFixed(0)    : '—';
-    const wrWithout = withoutInst.length ? _winRate(withoutInst).toFixed(0) : '—';
-    const rWith     = withInst.length    ? _calcR(withInst)                 : '—';
-    return { label: ST_SIG_LABELS[inst], count: withInst.length, wrWith, wrWithout, rWith };
-  });
-
   const tableEl = document.getElementById('st-confluence-table');
   if (tableEl) {
     tableEl.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-        <div>
-          <div class="text-xs text-muted" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">By Score</div>
-          <table style="width:100%;border-collapse:collapse">
-            <thead><tr>
-              ${['Score','Setups','Win %','Avg R','Total R'].map(h => `<th style="text-align:left;padding:4px 8px;font-size:11px;color:var(--text-muted)">${h}</th>`).join('')}
-            </tr></thead>
-            <tbody>
-              ${[0,1,2,3,4].filter(sc => byScore[sc].length).map(sc => {
-                const ts  = byScore[sc];
-                const wins = ts.filter(s => s.outcome === 'win').length;
-                const totalR = _calcR(ts);
-                const avgR   = ts.length ? parseFloat((totalR / ts.length).toFixed(2)) : 0;
-                const scoreColor = sc === 4 ? '#00e676' : sc === 3 ? '#4cd964' : sc === 2 ? '#ffa502' : sc === 1 ? '#ff8c00' : 'var(--text-muted)';
-                return `<tr>
-                  <td style="padding:4px 8px"><span style="font-weight:700;color:${scoreColor};font-size:12px">${sc}/4</span></td>
-                  <td style="padding:4px 8px;font-size:12px">${ts.length}</td>
-                  <td style="padding:4px 8px;font-size:12px;color:var(--profit)">${(wins/ts.length*100).toFixed(0)}%</td>
-                  <td style="padding:4px 8px;font-size:12px;color:${avgR >= 0 ? 'var(--profit)' : 'var(--loss)'}">${avgR >= 0 ? '+' : ''}${avgR}R</td>
-                  <td style="padding:4px 8px;font-size:12px;color:${totalR >= 0 ? 'var(--profit)' : 'var(--loss)'}">${totalR >= 0 ? '+' : ''}${totalR}R</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <div class="text-xs text-muted" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Per Instrument</div>
-          <table style="width:100%;border-collapse:collapse">
-            <thead><tr>
-              ${['Instrument','Setups','WR with','WR without','R with'].map(h => `<th style="text-align:left;padding:4px 8px;font-size:11px;color:var(--text-muted)">${h}</th>`).join('')}
-            </tr></thead>
-            <tbody>
-              ${instStats.map(r => `<tr>
-                <td style="padding:4px 8px;font-size:12px;font-weight:600">${r.label}</td>
-                <td style="padding:4px 8px;font-size:12px;color:var(--text-muted)">${r.count}</td>
-                <td style="padding:4px 8px;font-size:12px;color:var(--profit)">${r.wrWith}${r.wrWith !== '—' ? '%' : ''}</td>
-                <td style="padding:4px 8px;font-size:12px;color:var(--text-muted)">${r.wrWithout}${r.wrWithout !== '—' ? '%' : ''}</td>
-                <td style="padding:4px 8px;font-size:12px;color:${r.rWith !== '—' && r.rWith >= 0 ? 'var(--profit)' : 'var(--loss)'}">${r.rWith !== '—' ? (r.rWith >= 0 ? '+' : '') + r.rWith + 'R' : '—'}</td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          ${['Combination','Setups','Win %','Avg R','Total R'].map(h =>
+            `<th style="text-align:left;padding:4px 8px;font-size:11px;color:var(--text-muted)">${h}</th>`).join('')}
+        </tr></thead>
+        <tbody>
+          ${_stConfCombos.map(([key, {signals, setups}], i) => {
+            const label  = key === '__none__'
+              ? '<span style="color:var(--text-muted)">No Signals</span>'
+              : signals.map(s => `<span style="color:var(--accent)">${ST_SIG_LABELS[s] || s}</span>`).join(' <span style="color:var(--text-muted)">+</span> ');
+            const wins   = setups.filter(s => s.outcome === 'win').length;
+            const totalR = _calcR(setups);
+            const avgR   = setups.length ? parseFloat((totalR / setups.length).toFixed(2)) : 0;
+            const wr     = setups.length ? (wins / setups.length * 100).toFixed(0) : '0';
+            return `<tr style="cursor:pointer" onclick="window._showStComboSetups(${i})" title="Click to see trades">
+              <td style="padding:6px 8px;font-size:12px">${label}</td>
+              <td style="padding:6px 8px;font-size:12px">${setups.length}</td>
+              <td style="padding:6px 8px;font-size:12px;color:var(--profit)">${wr}%</td>
+              <td style="padding:6px 8px;font-size:12px;color:${avgR >= 0 ? 'var(--profit)' : 'var(--loss)'}">${avgR >= 0 ? '+' : ''}${avgR}R</td>
+              <td style="padding:6px 8px;font-size:12px;color:${totalR >= 0 ? 'var(--profit)' : 'var(--loss)'}">${totalR >= 0 ? '+' : ''}${totalR}R</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
     `;
+    window._showStComboSetups = idx => showStConfluenceDrilldown(idx);
   }
 }
 
-function showStConfluenceDrilldown(scoreIdx) {
+function showStConfluenceDrilldown(comboIdx) {
   const panel = document.getElementById('st-confluence-drilldown');
   if (!panel) return;
 
-  const setups = _stConfByScore[scoreIdx] || [];
+  const combo = _stConfCombos[comboIdx];
+  if (!combo) { panel.style.display = 'none'; return; }
+
+  const [key, { signals, setups }] = combo;
   if (!setups.length) { panel.style.display = 'none'; return; }
 
-  const scoreColor = scoreIdx === 4 ? '#00e676' : scoreIdx === 3 ? '#4cd964' : scoreIdx === 2 ? '#ffa502' : scoreIdx === 1 ? '#ff8c00' : 'var(--text-muted)';
+  const label  = key === '__none__' ? 'No Signals' : signals.map(s => ST_SIG_LABELS[s] || s).join(' + ');
   const totalR = _calcR(setups);
   const wins   = setups.filter(s => s.outcome === 'win').length;
 
@@ -960,15 +1012,15 @@ function showStConfluenceDrilldown(scoreIdx) {
       <div class="card-header" style="margin-bottom:16px">
         <div>
           <div class="card-title">
-            Score <span style="color:${scoreColor};font-weight:800">${scoreIdx}/4</span> — ${setups.length} setup${setups.length !== 1 ? 's' : ''}
+            <span style="color:var(--accent)">${label}</span> — ${setups.length} setup${setups.length !== 1 ? 's' : ''}
           </div>
           <div class="card-subtitle">
-            ${(wins/setups.length*100).toFixed(0)}% win rate ·
+            ${(wins / setups.length * 100).toFixed(0)}% win rate ·
             ${totalR >= 0 ? '+' : ''}${totalR}R total ·
-            ${setups.filter(s=>s.outcome==='loss').length} losses
+            ${setups.filter(s => s.outcome === 'loss').length} losses
           </div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('st-confluence-drilldown').style.display='none'">✕ Close</button>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('st-confluence-drilldown').style.display='none'">✕ Close</button>
       </div>
       <div class="table-wrapper">
         <table>
@@ -987,7 +1039,6 @@ function showStConfluenceDrilldown(scoreIdx) {
     </div>
   `;
 
-  // Wire edit/delete buttons in the drilldown
   panel.querySelectorAll('.st-edit-btn').forEach(btn => {
     btn.onclick = () => {
       const setup = setups.find(s => s.id === btn.dataset.id);
@@ -1177,6 +1228,17 @@ function ensureModalsInDom() {
     btns.forEach(b => b.classList.toggle('active', !allActive));
     _updateStSignalScore();
   };
+
+  // Auto-set outcome to Loss when a negative R is entered
+  const possibleRInput = document.getElementById('st-possible-r');
+  if (possibleRInput) {
+    possibleRInput.addEventListener('input', () => {
+      const val = parseFloat(possibleRInput.value);
+      if (!isNaN(val) && val < 0) {
+        document.getElementById('st-outcome').value = 'loss';
+      }
+    });
+  }
 
   document.getElementById('st-pair-modal-backdrop').onclick = closePairModal;
   document.getElementById('st-pair-modal-close').onclick    = closePairModal;
