@@ -170,12 +170,12 @@ async function loadAllTimeAndChart() {
     const allSetups = await getStrategySetups();
     const stats = calcSetupStats(allSetups);
     if (statsEl) statsEl.innerHTML = buildAllTimeStats(stats);
-    renderChartSection(allSetups);
-    renderBreakdownCharts(allSetups);
-    renderStConfluence(allSetups);
+    // Each renderer is isolated so a chart error doesn't wipe out the stats above
+    try { renderChartSection(allSetups); } catch (e) { if (chartEl) chartEl.innerHTML = `<p class="text-loss text-sm" style="padding:20px">${e.message}</p>`; }
+    try { renderBreakdownCharts(allSetups); } catch (e) { console.error('Breakdown charts:', e); }
+    try { renderStConfluence(allSetups); } catch (e) { console.error('Confluence:', e); }
   } catch (err) {
     if (statsEl) statsEl.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
-    if (chartEl) chartEl.innerHTML = `<p class="text-loss text-sm" style="padding:20px">${err.message}</p>`;
   }
 }
 
