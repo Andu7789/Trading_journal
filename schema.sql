@@ -148,6 +148,13 @@ CREATE POLICY "Allow all for anon" ON public.notes
   FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================
+--  STRATEGY SETUPS — add trade_time column
+--  Run this if the column doesn't exist yet:
+-- =============================================
+ALTER TABLE public.strategy_setups
+  ADD COLUMN IF NOT EXISTS trade_time TEXT;
+
+-- =============================================
 --  STORAGE
 --  After running this SQL, go to Storage in
 --  your Supabase dashboard and:

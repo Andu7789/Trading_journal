@@ -482,6 +482,7 @@ function _sortedDaySetups() {
   if (!col) return [..._dayModalSetups];
   return [..._dayModalSetups].sort((a, b) => {
     let av, bv;
+    if (col === 'time')    { av = a.trade_time || '';  bv = b.trade_time || ''; }
     if (col === 'pair')    { av = a.pair || '';        bv = b.pair || ''; }
     if (col === 'dir')     { av = a.direction || '';   bv = b.direction || ''; }
     if (col === 'r')       { av = parseFloat(a.possible_r) || 0; bv = parseFloat(b.possible_r) || 0; }
@@ -515,6 +516,7 @@ function _renderDayModalTable(bodyEl) {
       <table>
         <thead>
           <tr>
+            <th data-sort-col="time"    style="cursor:pointer;user-select:none">Time${sortIcon('time')}</th>
             <th data-sort-col="pair"    style="cursor:pointer;user-select:none">Pair${sortIcon('pair')}</th>
             <th data-sort-col="dir"     style="cursor:pointer;user-select:none">Dir${sortIcon('dir')}</th>
             <th data-sort-col="r"       style="cursor:pointer;user-select:none">Possible R${sortIcon('r')}</th>
@@ -526,6 +528,7 @@ function _renderDayModalTable(bodyEl) {
         <tbody>
           ${sorted.map(s => `
             <tr style="cursor:pointer" data-id="${s.id}">
+              <td class="td-mono" style="font-size:12px">${s.trade_time || '—'}</td>
               <td><strong>${s.pair || '—'}</strong></td>
               <td>${getDirectionBadge(s.direction)}</td>
               <td class="td-mono">${s.possible_r != null ? s.possible_r + 'R' : '—'}</td>
@@ -1170,7 +1173,7 @@ function buildSetupRow(s) {
 
   return `
     <tr>
-      <td class="td-mono">${formatDate(s.date)}</td>
+      <td class="td-mono">${formatDate(s.date)}${s.trade_time ? `<div style="font-size:10px;color:var(--text-muted);margin-top:1px">${s.trade_time}</div>` : ''}</td>
       <td><strong>${escapeHtml(s.pair)}</strong></td>
       <td>${dirBadge}</td>
       <td class="td-mono">${s.possible_r != null ? s.possible_r + 'R' : '—'}</td>
@@ -1221,6 +1224,16 @@ function ensureModalsInDom() {
   document.getElementById('st-modal-cancel').onclick    = closeSetupModal;
   document.getElementById('st-modal-save').onclick      = handleSaveSetup;
 
+  // Populate hour dropdown (00–23) once
+  const hourSel = document.getElementById('st-hour');
+  if (hourSel && !hourSel.options.length) {
+    hourSel.innerHTML = '<option value="">--</option>' +
+      Array.from({length: 24}, (_, i) => {
+        const h = String(i).padStart(2, '0');
+        return `<option value="${h}">${h}</option>`;
+      }).join('');
+  }
+
   const stAllBtn = document.getElementById('st-signal-all');
   if (stAllBtn) stAllBtn.onclick = () => {
     const btns = document.querySelectorAll('.st-signal-toggle');
@@ -1261,6 +1274,8 @@ function openSetupModal(setup = null) {
   // Reset form
   document.getElementById('st-setup-id').value   = '';
   document.getElementById('st-date').value        = todayString();
+  document.getElementById('st-hour').value        = '';
+  document.getElementById('st-minute').value      = '';
   document.getElementById('st-direction').value   = '';
   document.getElementById('st-possible-r').value  = '';
   document.getElementById('st-outcome').value     = 'win';
@@ -1284,6 +1299,11 @@ function openSetupModal(setup = null) {
     document.getElementById('st-modal-title').textContent = 'Edit Setup';
     document.getElementById('st-setup-id').value  = setup.id;
     document.getElementById('st-date').value       = setup.date || todayString();
+    if (setup.trade_time) {
+      const [h, m] = setup.trade_time.split(':');
+      document.getElementById('st-hour').value   = h || '';
+      document.getElementById('st-minute').value = m || '';
+    }
     pairSel.value                                  = setup.pair || '';
     document.getElementById('st-direction').value  = setup.direction || '';
     document.getElementById('st-possible-r').value = setup.possible_r ?? '';
@@ -1376,9 +1396,13 @@ async function handleSaveSetup() {
       }
     }
 
+    const hour = document.getElementById('st-hour').value;
+    const min  = document.getElementById('st-minute').value;
+
     const setupData = {
       id:          document.getElementById('st-setup-id').value || undefined,
       date,
+      trade_time:  (hour && min) ? `${hour}:${min}` : null,
       pair,
       direction:   document.getElementById('st-direction').value || null,
       possible_r:  parseFloat(document.getElementById('st-possible-r').value) || null,
