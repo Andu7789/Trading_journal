@@ -1433,6 +1433,14 @@ function _applyCopyFrom() {
     document.getElementById('st-minute').value = m || '';
   }
 
+  // Copy direction
+  if (src.direction) {
+    document.getElementById('st-direction').value = src.direction;
+    document.querySelectorAll('.st-dir-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.dir === src.direction);
+    });
+  }
+
   // Copy signals
   document.querySelectorAll('.st-signal-toggle').forEach(btn => {
     btn.classList.toggle('active', Array.isArray(src.signals) && src.signals.includes(btn.dataset.signal));
