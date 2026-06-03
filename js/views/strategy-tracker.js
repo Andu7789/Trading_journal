@@ -1253,6 +1253,17 @@ function ensureModalsInDom() {
     });
   }
 
+  // Auto-populate Possible R with -1 when Loss is selected
+  const outcomeSelect = document.getElementById('st-outcome');
+  if (outcomeSelect) {
+    outcomeSelect.addEventListener('change', () => {
+      if (outcomeSelect.value === 'loss') {
+        const rInput = document.getElementById('st-possible-r');
+        if (!rInput.value || parseFloat(rInput.value) >= 0) rInput.value = -1;
+      }
+    });
+  }
+
   document.getElementById('st-pair-modal-backdrop').onclick = closePairModal;
   document.getElementById('st-pair-modal-close').onclick    = closePairModal;
   document.getElementById('st-pair-add-btn').onclick        = addNewPair;
