@@ -1173,7 +1173,7 @@ function buildSetupRow(s) {
 
   return `
     <tr>
-      <td class="td-mono">${formatDate(s.date)}${s.trade_time ? `<div style="font-size:10px;color:var(--text-muted);margin-top:1px">${s.trade_time}</div>` : ''}</td>
+      <td class="td-mono">${formatDate(s.date)}${s.trade_time ? ` <span style="color:var(--text-muted)">${s.trade_time}</span>` : ''}</td>
       <td><strong>${escapeHtml(s.pair)}</strong></td>
       <td>${dirBadge}</td>
       <td class="td-mono">${s.possible_r != null ? s.possible_r + 'R' : '—'}</td>
