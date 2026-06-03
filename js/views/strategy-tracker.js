@@ -1173,7 +1173,7 @@ function buildSetupRow(s) {
 
   return `
     <tr>
-      <td class="td-mono">${formatDate(s.date)}${s.trade_time ? ` <span style="color:var(--text-muted)">${s.trade_time}</span>` : ''}</td>
+      <td class="td-mono">${formatDate(s.date)}${s.trade_time ? ` ${s.trade_time}` : ''}</td>
       <td><strong>${escapeHtml(s.pair)}</strong></td>
       <td>${dirBadge}</td>
       <td class="td-mono">${s.possible_r != null ? s.possible_r + 'R' : '—'}</td>
@@ -1306,7 +1306,12 @@ function openSetupModal(setup = null) {
   document.querySelectorAll('.st-signal-toggle').forEach(b => b.classList.remove('active'));
   _updateStSignalScore();
 
+  // Copy-from section: show only in Add mode
+  const copySection = document.getElementById('st-copy-from-section');
+  const copySelect  = document.getElementById('st-copy-from-select');
+
   if (setup) {
+    if (copySection) copySection.style.display = 'none';
     document.getElementById('st-modal-title').textContent = 'Edit Setup';
     document.getElementById('st-setup-id').value  = setup.id;
     document.getElementById('st-date').value       = setup.date || todayString();
@@ -1353,6 +1358,16 @@ function openSetupModal(setup = null) {
     }
   } else {
     document.getElementById('st-modal-title').textContent = 'Add Setup';
+    if (copySection) {
+      copySection.style.display = '';
+      _loadCopyFromOptions(document.getElementById('st-date').value);
+    }
+    // Refresh list when date changes
+    document.getElementById('st-date').onchange = () =>
+      _loadCopyFromOptions(document.getElementById('st-date').value);
+    if (copySelect) {
+      copySelect.onchange = _applyCopyFrom;
+    }
   }
 
   // Show modal
@@ -1377,6 +1392,55 @@ function openSetupModal(setup = null) {
 function closeSetupModal() {
   document.getElementById('st-modal')?.classList.add('hidden');
   pendingSetupScreenshots = [];
+}
+
+async function _loadCopyFromOptions(date) {
+  const sel = document.getElementById('st-copy-from-select');
+  if (!sel || !date) return;
+  sel.innerHTML = '<option value="">— loading… —</option>';
+  try {
+    const setups = await getStrategySetups({ startDate: date, endDate: date });
+    if (!setups.length) {
+      sel.innerHTML = '<option value="">— no setups on this date —</option>';
+      sel._copySetups = [];
+      return;
+    }
+    sel._copySetups = setups;
+    sel.innerHTML = '<option value="">— pick a setup to copy from —</option>' +
+      setups.map((s, i) => {
+        const time = s.trade_time ? ` ${s.trade_time}` : '';
+        const sigs = Array.isArray(s.signals) && s.signals.length
+          ? ` [${s.signals.map(sig => ST_SIG_SHORT[sig] || sig).join('+')}]` : '';
+        return `<option value="${i}">${s.pair}${time}${sigs}</option>`;
+      }).join('');
+  } catch {
+    sel.innerHTML = '<option value="">— could not load setups —</option>';
+    sel._copySetups = [];
+  }
+}
+
+function _applyCopyFrom() {
+  const sel = document.getElementById('st-copy-from-select');
+  const idx = parseInt(sel.value);
+  if (isNaN(idx) || !sel._copySetups) return;
+  const src = sel._copySetups[idx];
+  if (!src) return;
+
+  // Copy time
+  if (src.trade_time) {
+    const [h, m] = src.trade_time.split(':');
+    document.getElementById('st-hour').value   = h || '';
+    document.getElementById('st-minute').value = m || '';
+  }
+
+  // Copy signals
+  document.querySelectorAll('.st-signal-toggle').forEach(btn => {
+    btn.classList.toggle('active', Array.isArray(src.signals) && src.signals.includes(btn.dataset.signal));
+  });
+  _updateStSignalScore();
+
+  // Reset select back to placeholder so it can be reused
+  sel.value = '';
 }
 
 async function handleSaveSetup() {
