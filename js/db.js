@@ -280,6 +280,58 @@ export async function deleteStrategySetup(id) {
 }
 
 // =============================================
+//  BULK DELETE (Danger Zone)
+// =============================================
+
+async function _deleteStorageFiles(urls) {
+  if (!urls.length) return;
+  const names = [...new Set(urls.map(u => u.split('/').pop()).filter(Boolean))];
+  try {
+    await _client.storage.from('screenshots').remove(names);
+  } catch (e) {
+    console.warn('Some screenshots could not be deleted:', e);
+  }
+}
+
+export async function deleteAllTrades() {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { data } = await _client.from('trades').select('screenshots');
+  await _deleteStorageFiles((data || []).flatMap(r => r.screenshots || []));
+  const { error } = await _client.from('trades').delete().not('id', 'is', null);
+  if (error) throw error;
+}
+
+export async function deleteAllStrategySetups() {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { data } = await _client.from('strategy_setups').select('screenshots');
+  await _deleteStorageFiles((data || []).flatMap(r => r.screenshots || []));
+  const { error } = await _client.from('strategy_setups').delete().not('id', 'is', null);
+  if (error) throw error;
+}
+
+export async function deleteAllData() {
+  if (!_client) throw new Error('Not connected to Supabase');
+  // Wipe the entire screenshots bucket
+  try {
+    const { data: files } = await _client.storage.from('screenshots').list();
+    if (files && files.length) {
+      await _client.storage.from('screenshots').remove(files.map(f => f.name));
+    }
+  } catch (e) {
+    console.warn('Could not fully clear screenshots bucket:', e);
+  }
+  // Delete all table data (errors in individual tables are non-fatal)
+  await Promise.allSettled([
+    _client.from('trades').delete().not('id', 'is', null),
+    _client.from('strategy_setups').delete().not('id', 'is', null),
+    _client.from('journal_entries').delete().not('id', 'is', null),
+    _client.from('notes').delete().not('id', 'is', null),
+    _client.from('watchlist_ideas').delete().not('id', 'is', null),
+    _client.from('playbook').delete().not('id', 'is', null),
+  ]);
+}
+
+// =============================================
 //  NOTES
 // =============================================
 

@@ -1,7 +1,7 @@
 // =============================================
 //  SETTINGS VIEW
 // =============================================
-import { initSupabase, testConnection } from '../db.js';
+import { initSupabase, testConnection, deleteAllTrades, deleteAllStrategySetups, deleteAllData } from '../db.js';
 import { showToast } from '../app.js';
 
 export async function renderSettings(container) {
@@ -112,6 +112,41 @@ export async function renderSettings(container) {
       </div>
     </div>
 
+    <!-- Danger Zone -->
+    <div class="settings-card" style="border-color:rgba(255,71,87,0.35)">
+      <div class="settings-title" style="color:var(--loss)">Danger Zone</div>
+      <div class="settings-subtitle">These actions are permanent and cannot be undone. All associated screenshots are deleted from storage too.</div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--bg-input);border-radius:var(--radius);border:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:600">Delete All Trades</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Removes every entry in the trade log and their screenshots</div>
+          </div>
+          <button class="btn btn-danger btn-sm" id="del-trades-btn">Delete Trades</button>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--bg-input);border-radius:var(--radius);border:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:600">Delete All Strategy Setups</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Removes every entry in the Strategy Tracker and their screenshots</div>
+          </div>
+          <button class="btn btn-danger btn-sm" id="del-setups-btn">Delete Setups</button>
+        </div>
+
+        <div style="padding:16px;background:rgba(255,71,87,0.07);border-radius:var(--radius);border:1px solid rgba(255,71,87,0.4)">
+          <div style="font-size:13px;font-weight:700;color:var(--loss);margin-bottom:4px">Delete Everything</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Permanently deletes all trades, strategy setups, journal entries, notes, watchlist ideas, playbook entries, and every screenshot. The app will be completely empty.</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="text" id="del-confirm-input" class="form-input" style="max-width:200px" placeholder='Type "DELETE ALL"'>
+            <button class="btn btn-danger" id="del-all-btn">Delete Everything</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- About -->
     <div class="settings-card">
       <div class="settings-title">About TradeJournal Pro</div>
@@ -128,6 +163,9 @@ export async function renderSettings(container) {
   document.getElementById('save-prefs-btn').onclick = savePreferences;
   document.getElementById('export-csv-btn').onclick = exportCsv;
   document.getElementById('export-json-btn').onclick = exportJson;
+  document.getElementById('del-trades-btn').onclick = handleDeleteTrades;
+  document.getElementById('del-setups-btn').onclick = handleDeleteSetups;
+  document.getElementById('del-all-btn').onclick = handleDeleteAll;
 }
 
 async function saveSupabaseConfig() {
@@ -228,6 +266,60 @@ async function exportJson() {
     showToast('All data exported as JSON', 'success');
   } catch (err) {
     showToast('Export failed: ' + err.message, 'error');
+  }
+}
+
+async function handleDeleteTrades() {
+  const btn = document.getElementById('del-trades-btn');
+  if (!confirm('Permanently delete ALL trades and their screenshots? This cannot be undone.')) return;
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    await deleteAllTrades();
+    showToast('All trades deleted', 'success');
+  } catch (err) {
+    showToast('Failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Delete Trades';
+  }
+}
+
+async function handleDeleteSetups() {
+  const btn = document.getElementById('del-setups-btn');
+  if (!confirm('Permanently delete ALL strategy setups and their screenshots? This cannot be undone.')) return;
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    await deleteAllStrategySetups();
+    showToast('All strategy setups deleted', 'success');
+  } catch (err) {
+    showToast('Failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Delete Setups';
+  }
+}
+
+async function handleDeleteAll() {
+  const input = document.getElementById('del-confirm-input').value.trim();
+  if (input !== 'DELETE ALL') {
+    showToast('Type DELETE ALL to confirm', 'error');
+    return;
+  }
+  if (!confirm('This will permanently delete ALL data and every screenshot. There is no undo. Proceed?')) return;
+  const btn = document.getElementById('del-all-btn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    await deleteAllData();
+    document.getElementById('del-confirm-input').value = '';
+    showToast('All data deleted — the app is now empty', 'success');
+  } catch (err) {
+    showToast('Failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Delete Everything';
   }
 }
 
