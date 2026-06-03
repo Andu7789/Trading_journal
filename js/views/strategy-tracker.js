@@ -1458,6 +1458,8 @@ async function handleSaveSetup() {
 
   if (!pair) { showToast('Select a pair', 'error'); return; }
   if (!date) { showToast('Date is required', 'error'); return; }
+  const activeSignals = document.querySelectorAll('.st-signal-toggle.active');
+  if (!activeSignals.length) { showToast('Select at least one correlation pair', 'error'); return; }
 
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving...';
