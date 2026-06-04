@@ -231,6 +231,11 @@ export async function renderSettings(container) {
   document.getElementById('regen-topic-btn').onclick = regenNtfyTopic;
   document.getElementById('copy-ntfy-url-btn').onclick = copyNtfyUrl;
   document.getElementById('test-ntfy-btn').onclick = sendTestNotification;
+
+  document.getElementById('ntfy-topic-input').addEventListener('input', e => {
+    const val = e.target.value.trim().replace(/\s+/g, '-');
+    document.getElementById('ntfy-url-display').value = val ? `https://ntfy.sh/${val}` : '';
+  });
 }
 
 async function saveSupabaseConfig() {
