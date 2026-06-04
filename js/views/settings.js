@@ -13,6 +13,13 @@ export async function renderSettings(container) {
   const savedCurrency = localStorage.getItem('tj_currency') || 'USD';
   const isConnected = !!savedUrl && !!savedKey;
 
+  // Ensure a ntfy topic exists
+  if (!localStorage.getItem('tj_ntfy_topic')) {
+    localStorage.setItem('tj_ntfy_topic', generateNtfyTopic());
+  }
+  const ntfyTopic = localStorage.getItem('tj_ntfy_topic');
+  const ntfyUrl = `https://ntfy.sh/${ntfyTopic}`;
+
   container.innerHTML = `
     <div class="page-header">
       <h1>Settings</h1>
@@ -112,6 +119,59 @@ export async function renderSettings(container) {
       </div>
     </div>
 
+    <!-- TradingView Alerts -->
+    <div class="settings-card">
+      <div class="settings-title">TradingView Alerts</div>
+      <div class="settings-subtitle">Get real-time TradingView alerts on your phone via the free <strong>ntfy</strong> app — no TradingView app required</div>
+
+      <div class="setup-steps" style="margin-bottom:20px">
+        <div class="setup-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            Install the <strong>ntfy</strong> app on your phone — search <strong>"ntfy"</strong> on the App Store or Google Play (it's free and open-source).
+          </div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            In the ntfy app tap <strong>+</strong> and subscribe to your topic name shown below. Anyone who knows this topic can send you notifications, so keep it private.
+          </div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            In TradingView, open an alert → enable <strong>Webhook URL</strong> → paste the URL below. Set the alert message to plain text, e.g.:<br>
+            <code style="display:inline-block;margin-top:6px;font-family:var(--font-mono);font-size:11px;background:var(--bg-input);padding:4px 8px;border-radius:4px;color:var(--text-primary)">{{ticker}} alert at {{close}} on {{exchange}}:{{interval}}</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div style="margin-bottom:16px">
+        <label class="form-label">Your ntfy Topic Name</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="ntfy-topic-input" class="form-input" style="max-width:280px;font-family:var(--font-mono);font-size:13px" value="${ntfyTopic}">
+          <button class="btn btn-ghost btn-sm" id="regen-topic-btn">Regenerate</button>
+        </div>
+        <span class="form-hint">Change this to any unique string. Avoid common words — it's your private notification channel.</span>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <label class="form-label">Webhook URL (paste this into TradingView)</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="ntfy-url-display" class="form-input" style="max-width:380px;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary)" value="${ntfyUrl}" readonly>
+          <button class="btn btn-ghost btn-sm" id="copy-ntfy-url-btn">Copy URL</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary" id="save-ntfy-btn">Save Topic</button>
+        <button class="btn btn-ghost" id="test-ntfy-btn">Send Test Notification</button>
+        <span id="ntfy-result" style="font-size:13px"></span>
+      </div>
+    </div>
+
     <!-- Danger Zone -->
     <div class="settings-card" style="border-color:rgba(255,71,87,0.35)">
       <div class="settings-title" style="color:var(--loss)">Danger Zone</div>
@@ -166,6 +226,16 @@ export async function renderSettings(container) {
   document.getElementById('del-trades-btn').onclick = handleDeleteTrades;
   document.getElementById('del-setups-btn').onclick = handleDeleteSetups;
   document.getElementById('del-all-btn').onclick = handleDeleteAll;
+
+  document.getElementById('save-ntfy-btn').onclick = saveNtfyTopic;
+  document.getElementById('regen-topic-btn').onclick = regenNtfyTopic;
+  document.getElementById('copy-ntfy-url-btn').onclick = copyNtfyUrl;
+  document.getElementById('test-ntfy-btn').onclick = sendTestNotification;
+
+  document.getElementById('ntfy-topic-input').addEventListener('input', e => {
+    const val = e.target.value.trim().replace(/\s+/g, '-');
+    document.getElementById('ntfy-url-display').value = val ? `https://ntfy.sh/${val}` : '';
+  });
 }
 
 async function saveSupabaseConfig() {
@@ -332,4 +402,75 @@ function downloadFile(content, filename, type) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// --- ntfy helpers ---
+
+function generateNtfyTopic() {
+  const words = ['swift','delta','chart','signal','rally','pivot','spike','range','trend','alpha','bravo','echo','foxtrot','zulu','kilo'];
+  const pick = () => words[Math.floor(Math.random() * words.length)];
+  const rand = () => Math.floor(Math.random() * 9000 + 1000);
+  return `tj-${pick()}-${pick()}-${rand()}`;
+}
+
+function saveNtfyTopic() {
+  const input = document.getElementById('ntfy-topic-input').value.trim().replace(/\s+/g, '-');
+  if (!input) { showToast('Topic name cannot be empty', 'error'); return; }
+  localStorage.setItem('tj_ntfy_topic', input);
+  document.getElementById('ntfy-url-display').value = `https://ntfy.sh/${input}`;
+  showToast('ntfy topic saved', 'success');
+}
+
+function regenNtfyTopic() {
+  const newTopic = generateNtfyTopic();
+  document.getElementById('ntfy-topic-input').value = newTopic;
+  document.getElementById('ntfy-url-display').value = `https://ntfy.sh/${newTopic}`;
+}
+
+async function copyNtfyUrl() {
+  const url = document.getElementById('ntfy-url-display').value;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Webhook URL copied', 'success');
+  } catch {
+    document.getElementById('ntfy-url-display').select();
+    showToast('Select and copy the URL manually', 'info');
+  }
+}
+
+async function sendTestNotification() {
+  const topic = document.getElementById('ntfy-topic-input').value.trim();
+  if (!topic) { showToast('Save a topic name first', 'error'); return; }
+
+  const btn = document.getElementById('test-ntfy-btn');
+  const result = document.getElementById('ntfy-result');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  result.textContent = '';
+
+  try {
+    const res = await fetch(`https://ntfy.sh/${topic}`, {
+      method: 'POST',
+      headers: {
+        'Title': 'TradingView Alert Test',
+        'Priority': 'high',
+        'Tags': 'chart_with_upwards_trend',
+      },
+      body: 'Test alert from TradeJournal Pro — your TradingView alerts are set up correctly!',
+    });
+
+    if (res.ok) {
+      result.textContent = '✓ Notification sent — check your phone';
+      result.style.color = 'var(--profit)';
+    } else {
+      result.textContent = `✗ Failed (HTTP ${res.status})`;
+      result.style.color = 'var(--loss)';
+    }
+  } catch (err) {
+    result.textContent = '✗ Network error — check your connection';
+    result.style.color = 'var(--loss)';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send Test Notification';
+  }
 }
