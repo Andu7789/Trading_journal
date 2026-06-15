@@ -718,9 +718,12 @@ async function handleSaveTrade() {
   const saveBtn = document.getElementById('save-trade-btn');
   const symbol  = document.getElementById('trade-symbol').value.trim();
   const direction = document.getElementById('trade-direction').value;
+  const tradeHour = document.getElementById('trade-hour').value;
+  const tradeMinute = document.getElementById('trade-minute').value;
 
   const tradeType = document.getElementById('trade-type').value || 'taken';
   if (!symbol)                        { showToast('Symbol is required', 'error'); return; }
+  if (!tradeHour || !tradeMinute)     { showToast('Trade time is required', 'error'); return; }
   if (!direction && tradeType !== 'missed') { showToast('Select Long or Short', 'error'); return; }
   if (tradeType === 'taken') {
     const pnlVal  = document.getElementById('trade-pnl')?.value;
@@ -756,13 +759,11 @@ async function handleSaveTrade() {
     const riskVal = parseFloatOrNull('trade-risk');
     const rVal    = (pnlVal !== null && riskVal !== null && riskVal > 0)
       ? parseFloat((pnlVal / riskVal).toFixed(2)) : null;
-    const tradeHour   = document.getElementById('trade-hour').value;
-    const tradeMinute = document.getElementById('trade-minute').value;
 
     const tradeData = {
       id:           document.getElementById('trade-id').value || undefined,
       date:         document.getElementById('trade-date').value,
-      trade_time:   (tradeHour && tradeMinute) ? `${tradeHour}:${tradeMinute}` : null,
+      trade_time:   `${tradeHour}:${tradeMinute}`,
       symbol:       symbol.toUpperCase(),
       direction,
       size:         parseFloatOrNull('trade-size'),
