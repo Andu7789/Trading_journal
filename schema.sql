@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS public.journal_entries (
   lessons_learned TEXT DEFAULT '',
   tomorrow_focus  TEXT DEFAULT '',
   general_notes   TEXT DEFAULT '',
+  trading_sins    JSONB,
 
   -- Self-assessment ratings (1-10)
   discipline_rating   SMALLINT DEFAULT 5 CHECK (discipline_rating BETWEEN 1 AND 10),
@@ -157,6 +158,9 @@ ALTER TABLE public.strategy_setups
 
 ALTER TABLE public.trades
   ADD COLUMN IF NOT EXISTS trade_time TEXT;
+
+ALTER TABLE public.journal_entries
+  ADD COLUMN IF NOT EXISTS trading_sins JSONB;
 
 -- =============================================
 --  STORAGE

@@ -5,7 +5,7 @@ import { getTrades, getJournalEntries, getStrategySetups } from '../db.js';
 import { calcStats, formatCurrency, formatDate, formatDateShort,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          todayString, getWeekRange, addDays, nl2br, getSignalDisplay,
-         calcTradeR, formatR } from '../utils.js';
+         calcTradeR, formatR, escapeHtml } from '../utils.js';
 import { openTradeModal } from '../app.js';
 
 let currentWeekStart  = null;
@@ -150,6 +150,8 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries, strategy
 
     ${strategySetups.length ? buildOpportunityComparison(days) : ''}
 
+    ${buildWeeklySins(journalEntries)}
+
     <!-- Day Cards Grid -->
     <div class="week-day-grid" style="margin-bottom:24px">
       ${days.map(d => buildDayCard(d, today)).join('')}
@@ -167,6 +169,66 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries, strategy
         <p>No trades or journal entries found for this week</p>
       </div>
     ` : ''}
+  `;
+}
+
+function buildWeeklySins(journalEntries) {
+  const totals = new Map();
+  const byDate = new Map();
+
+  journalEntries.forEach(entry => {
+    const dayTotal = (Array.isArray(entry.trading_sins) ? entry.trading_sins : [])
+      .reduce((sum, sin) => sum + Math.max(0, parseInt(sin?.count) || 0), 0);
+    if (dayTotal) byDate.set(entry.date, dayTotal);
+
+    (Array.isArray(entry.trading_sins) ? entry.trading_sins : []).forEach(sin => {
+      const name = typeof sin?.name === 'string' ? sin.name.trim() : '';
+      const count = Math.max(0, parseInt(sin?.count) || 0);
+      if (!name || !count) return;
+      const key = name.toLowerCase();
+      const existing = totals.get(key) || { name, count: 0 };
+      existing.count += count;
+      totals.set(key, existing);
+    });
+  });
+
+  const sins = [...totals.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  if (!sins.length) return '';
+  const weekTotal = sins.reduce((sum, sin) => sum + sin.count, 0);
+  const maxCount = Math.max(...sins.map(sin => sin.count));
+
+  return `
+    <div class="card weekly-sins">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Trading Sins</div>
+          <div class="card-subtitle">Running total of recorded occurrences this week</div>
+        </div>
+        <div class="weekly-sins-total">
+          <strong>${weekTotal}</strong>
+          <span>total</span>
+        </div>
+      </div>
+      <div class="weekly-sins-grid">
+        <div class="weekly-sins-list">
+          ${sins.map(sin => `
+            <div class="weekly-sin-row">
+              <span>${escapeHtml(sin.name)}</span>
+              <div class="weekly-sin-track"><div style="width:${sin.count / maxCount * 100}%"></div></div>
+              <strong>${sin.count}</strong>
+            </div>
+          `).join('')}
+        </div>
+        <div class="weekly-sins-days">
+          ${[...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, count]) => `
+            <div>
+              <span>${formatDateShort(date)}</span>
+              <strong>${count}</strong>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
   `;
 }
 

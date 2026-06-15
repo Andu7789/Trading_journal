@@ -5,13 +5,39 @@ import { getJournalEntry, saveJournalEntry, getTrades } from '../db.js';
 import { todayString, formatDate, addDays, calcStats, formatCurrency,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          tiltLabel, tiltClass, nl2br, debounce, getSignalDisplay,
-         calcTradeR, formatR } from '../utils.js';
+         calcTradeR, formatR, escapeHtml } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
 import { getNewsForDate, eventTime, newsFetchStatus } from '../news.js';
 
 let currentDate = todayString();
 let saveTimer = null;
 let pendingSave = false;
+let currentSins = [];
+
+const DEFAULT_SINS = [
+  'Exited too soon',
+  'Exited too late',
+  'Entered too soon',
+  'Entered too late',
+  'Not in trading plan',
+  'Incorrect stop placement',
+  'Wrong size trade',
+  "Didn't take planned trade",
+];
+
+function getSinDefinitions() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('tj_trading_sins'));
+    if (Array.isArray(stored)) {
+      return stored.filter(name => typeof name === 'string' && name.trim()).map(name => name.trim());
+    }
+  } catch {}
+  return [...DEFAULT_SINS];
+}
+
+function saveSinDefinitions() {
+  localStorage.setItem('tj_trading_sins', JSON.stringify(currentSins.map(sin => sin.name)));
+}
 
 export async function renderJournal(container, dateParam) {
   document.getElementById('page-title').textContent = 'Daily Journal';
@@ -82,6 +108,7 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
   const stats = calcStats(trades);
   const isToday = date === todayString();
   const dayLabel = formatDateLong(date);
+  currentSins = normalizeSins(entry.trading_sins);
 
   // Auto-fill Economic Events textarea when entry has no saved value
   const autoEconomicEvents = !entry.economic_events && news.length
@@ -179,6 +206,26 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
         </div>
       </div>
 
+      <!-- TRADING SINS -->
+      <div class="journal-section" id="section-sins">
+        <div class="journal-section-header" onclick="window._toggleSection('sins')">
+          <div class="section-header-left">
+            <span class="section-icon">!</span>
+            <span class="section-title">Trading Sins</span>
+            <span class="section-badge sin-section-badge" style="${totalSinCount(currentSins) ? '' : 'display:none'}">${totalSinCount(currentSins)}</span>
+          </div>
+          <span class="chevron">&#9662;</span>
+        </div>
+        <div class="journal-section-body">
+          <div class="text-sm text-muted">Record each occurrence as it happens. Counts reset for each journal day.</div>
+          <div id="sin-list">${buildSinList()}</div>
+          <div class="sin-add-row">
+            <input type="text" id="new-sin-name" class="form-input" placeholder="Add another trading sin...">
+            <button type="button" class="btn btn-ghost btn-sm" id="add-sin-btn">Add Sin</button>
+          </div>
+        </div>
+      </div>
+
       <!-- POST-SESSION REVIEW -->
       <div class="journal-section" id="section-review">
         <div class="journal-section-header" onclick="window._toggleSection('review')">
@@ -258,6 +305,80 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
       <button class="btn btn-primary btn-lg" id="save-journal-btn">Save Journal Entry</button>
     </div>
   `;
+}
+
+function normalizeSins(sins) {
+  const source = Array.isArray(sins) ? sins : getSinDefinitions().map(name => ({ name, count: 0 }));
+  return source
+    .filter(sin => sin && typeof sin.name === 'string' && sin.name.trim())
+    .map(sin => ({ name: sin.name.trim(), count: Math.max(0, parseInt(sin.count) || 0) }));
+}
+
+function totalSinCount(sins) {
+  return sins.reduce((sum, sin) => sum + sin.count, 0);
+}
+
+function buildSinList() {
+  if (!currentSins.length) {
+    return '<div class="empty-state sin-empty"><p>No sins listed. Add one below.</p></div>';
+  }
+
+  return `
+    <div class="sin-list">
+      ${currentSins.map((sin, index) => `
+        <div class="sin-row">
+          <span class="sin-name">${escapeHtml(sin.name)}</span>
+          <div class="sin-controls">
+            <button type="button" class="sin-count-btn sin-minus" data-index="${index}" title="Remove one occurrence">&minus;</button>
+            <span class="sin-count ${sin.count ? 'active' : ''}">${sin.count}</span>
+            <button type="button" class="sin-count-btn sin-plus" data-index="${index}" title="Record occurrence">+</button>
+            <button type="button" class="btn btn-danger btn-xs sin-delete" data-index="${index}">Delete</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderSinList(date) {
+  const list = document.getElementById('sin-list');
+  if (list) list.innerHTML = buildSinList();
+  const badge = document.querySelector('#section-sins .section-badge');
+  const total = totalSinCount(currentSins);
+  if (badge) {
+    badge.textContent = total;
+    badge.style.display = total ? '' : 'none';
+  }
+  wireSinControls(date);
+}
+
+function wireSinControls(date) {
+  document.querySelectorAll('.sin-plus').forEach(btn => {
+    btn.onclick = () => {
+      currentSins[parseInt(btn.dataset.index)].count++;
+      renderSinList(date);
+      triggerAutosave(date);
+    };
+  });
+  document.querySelectorAll('.sin-minus').forEach(btn => {
+    btn.onclick = () => {
+      const sin = currentSins[parseInt(btn.dataset.index)];
+      sin.count = Math.max(0, sin.count - 1);
+      renderSinList(date);
+      triggerAutosave(date);
+    };
+  });
+  document.querySelectorAll('.sin-delete').forEach(btn => {
+    btn.onclick = () => {
+      const index = parseInt(btn.dataset.index);
+      const sin = currentSins[index];
+      if (sin.count && !confirm(`Delete "${sin.name}" and its ${sin.count} recorded occurrence${sin.count !== 1 ? 's' : ''} for this day?`)) return;
+      currentSins.splice(index, 1);
+      saveSinDefinitions();
+      renderSinList(date);
+      triggerAutosave(date);
+    };
+  });
 }
 
 function buildNewsStrip(news, fetchStatus = { ok: true, error: null }) {
@@ -439,6 +560,26 @@ function initJournalInteractions(date) {
     el.oninput = debounce(() => triggerAutosave(date), 1500);
   });
 
+  wireSinControls(date);
+  const addSin = () => {
+    const input = document.getElementById('new-sin-name');
+    const name = input?.value.trim();
+    if (!name) return;
+    if (currentSins.some(sin => sin.name.toLowerCase() === name.toLowerCase())) {
+      showToast('That sin is already listed', 'warning');
+      return;
+    }
+    currentSins.push({ name, count: 0 });
+    saveSinDefinitions();
+    input.value = '';
+    renderSinList(date);
+    triggerAutosave(date);
+  };
+  document.getElementById('add-sin-btn').onclick = addSin;
+  document.getElementById('new-sin-name').onkeypress = e => {
+    if (e.key === 'Enter') addSin();
+  };
+
   // Manual save button
   document.getElementById('save-journal-btn').onclick = () => saveJournal(date, true);
 }
@@ -458,6 +599,7 @@ function getJournalData(date) {
     discipline_rating: parseInt(getValue('j-discipline')) || 5,
     emotion_rating:    parseInt(getValue('j-emotion')) || 5,
     overall_rating:    parseInt(getValue('j-overall')) || 5,
+    trading_sins:      currentSins,
   };
 }
 

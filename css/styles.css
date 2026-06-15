@@ -1260,6 +1260,152 @@ tbody td {
 .autosave-indicator.saving { color: var(--warning); }
 .autosave-indicator.saved  { color: var(--profit); }
 
+.sin-section-badge {
+  background: var(--loss-dim);
+  color: var(--loss);
+}
+
+.sin-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.sin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.sin-row:last-child { border-bottom: 0; }
+.sin-name { color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+
+.sin-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sin-count-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sin-count-btn:hover { border-color: var(--primary); color: var(--primary); }
+.sin-plus:hover { border-color: var(--loss); color: var(--loss); }
+
+.sin-count {
+  min-width: 28px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.sin-count.active { color: var(--loss); }
+
+.sin-add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.sin-add-row .form-input { flex: 1; }
+.sin-empty { padding: 20px; }
+
+.weekly-sins { margin-bottom: 20px; }
+
+.weekly-sins-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.weekly-sins-total strong {
+  color: var(--loss);
+  font-family: var(--font-mono);
+  font-size: 24px;
+}
+
+.weekly-sins-total span {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.weekly-sins-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr);
+  gap: 20px;
+}
+
+.weekly-sins-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.weekly-sin-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(100px, 2fr) 24px;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.weekly-sin-row strong {
+  color: var(--loss);
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.weekly-sin-track {
+  height: 7px;
+  overflow: hidden;
+  background: var(--bg-input);
+  border-radius: 4px;
+}
+
+.weekly-sin-track div {
+  height: 100%;
+  background: var(--loss);
+  border-radius: 4px;
+}
+
+.weekly-sins-days {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 20px;
+  border-left: 1px solid var(--border);
+}
+
+.weekly-sins-days div {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.weekly-sins-days strong {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
 /* =============================================
    WEEKLY REVIEW
    ============================================= */
@@ -1706,4 +1852,10 @@ tbody td {
   .week-day-grid { grid-template-columns: repeat(2, 1fr); }
   .opportunity-comparison-header { flex-direction: column; }
   .opportunity-summary { width: 100%; justify-content: flex-start; }
+  .sin-row { align-items: flex-start; flex-direction: column; }
+  .sin-controls { width: 100%; }
+  .sin-delete { margin-left: auto; }
+  .sin-add-row { flex-direction: column; }
+  .weekly-sins-grid { grid-template-columns: 1fr; }
+  .weekly-sins-days { padding-left: 0; padding-top: 12px; border-left: 0; border-top: 1px solid var(--border); }
 }
