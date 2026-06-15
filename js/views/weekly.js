@@ -171,54 +171,62 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries, strategy
 }
 
 function buildOpportunityComparison(days) {
-  const actual = days.reduce((sum, d) => sum + d.dayTakenTrades.length, 0);
-  const possible = days.reduce((sum, d) => sum + d.daySetups.length, 0);
-  const captureRate = possible ? Math.round(actual / possible * 100) : null;
-  const activeDays = days.filter(d => d.dayTakenTrades.length || d.daySetups.length);
-  const maxCount = Math.max(1, ...activeDays.flatMap(d => [d.dayTakenTrades.length, d.daySetups.length]));
+  const comparisonDays = days.map(d => ({
+    ...d,
+    actualR: sumActualR(d.dayTakenTrades),
+    possibleR: sumPossibleR(d.daySetups),
+  }));
+  const actualR = parseFloat(comparisonDays.reduce((sum, d) => sum + d.actualR, 0).toFixed(2));
+  const possibleR = parseFloat(comparisonDays.reduce((sum, d) => sum + d.possibleR, 0).toFixed(2));
+  const captureRate = possibleR > 0 ? Math.round(actualR / possibleR * 100) : null;
+  const activeDays = comparisonDays.filter(d =>
+    d.dayTakenTrades.some(t => calcTradeR(t) !== null) ||
+    d.daySetups.some(s => calcPossibleSetupR(s) !== null)
+  );
+  const maxR = Math.max(1, ...activeDays.flatMap(d => [Math.abs(d.actualR), Math.abs(d.possibleR)]));
 
   return `
     <div class="card opportunity-comparison">
       <div class="opportunity-comparison-header">
         <div>
-          <div class="card-title">Actual vs Possible</div>
-          <div class="card-subtitle">Trades taken compared with Strategy Tracker setups recorded on the same days</div>
+          <div class="card-title">Actual R vs Possible R</div>
+          <div class="card-subtitle">Actual R from trades taken compared with the Strategy Tracker result for the same days</div>
         </div>
         <div class="opportunity-summary">
           <div>
-            <span class="opportunity-summary-value text-profit">${actual}</span>
-            <span class="text-xs text-muted">taken</span>
+            <span class="opportunity-summary-value ${pnlClass(actualR)}">${formatR(actualR)}</span>
+            <span class="text-xs text-muted">actual R</span>
           </div>
           <div class="opportunity-summary-divider">/</div>
           <div>
-            <span class="opportunity-summary-value" style="color:var(--warning)">${possible}</span>
-            <span class="text-xs text-muted">possible</span>
+            <span class="opportunity-summary-value" style="color:var(--warning)">${formatR(possibleR)}</span>
+            <span class="text-xs text-muted">possible R</span>
           </div>
           <div class="opportunity-capture">
-            <span class="text-xs text-muted">Actual / possible</span>
+            <span class="text-xs text-muted">R captured</span>
             <strong>${captureRate !== null ? captureRate + '%' : '—'}</strong>
           </div>
         </div>
       </div>
       <div class="opportunity-legend">
-        <span><i class="opportunity-key actual"></i>Actual trades taken</span>
-        <span><i class="opportunity-key possible"></i>Possible setups</span>
+        <span><i class="opportunity-key actual"></i>Actual R</span>
+        <span><i class="opportunity-key possible"></i>Possible R</span>
       </div>
       <div class="opportunity-days">
         ${activeDays.map(d => {
-          const actualWidth = d.dayTakenTrades.length / maxCount * 100;
-          const possibleWidth = d.daySetups.length / maxCount * 100;
+          const actualWidth = Math.abs(d.actualR) / maxR * 100;
+          const possibleWidth = Math.abs(d.possibleR) / maxR * 100;
           return `
             <div class="opportunity-day">
               <div class="opportunity-day-label">${d.dayLabel} ${d.dayNum}</div>
               <div class="opportunity-bars">
                 <div class="opportunity-bar-row">
                   <div class="opportunity-bar-track"><div class="opportunity-bar actual" style="width:${actualWidth}%"></div></div>
-                  <span>${d.dayTakenTrades.length}</span>
+                  <span class="${pnlClass(d.actualR)}">${formatR(d.actualR)}</span>
                 </div>
                 <div class="opportunity-bar-row">
                   <div class="opportunity-bar-track"><div class="opportunity-bar possible" style="width:${possibleWidth}%"></div></div>
-                  <span>${d.daySetups.length}</span>
+                  <span class="${pnlClass(d.possibleR)}">${formatR(d.possibleR)}</span>
                 </div>
               </div>
             </div>
@@ -227,6 +235,22 @@ function buildOpportunityComparison(days) {
       </div>
     </div>
   `;
+}
+
+function sumActualR(trades) {
+  return parseFloat(trades.reduce((sum, trade) => sum + (calcTradeR(trade) ?? 0), 0).toFixed(2));
+}
+
+function calcPossibleSetupR(setup) {
+  if (!setup.outcome || setup.outcome === 'pending') return null;
+  if (setup.outcome === 'win') return parseFloat(setup.possible_r) || 0;
+  if (setup.outcome === 'loss') return -1;
+  if (setup.outcome === 'breakeven') return 0;
+  return null;
+}
+
+function sumPossibleR(setups) {
+  return parseFloat(setups.reduce((sum, setup) => sum + (calcPossibleSetupR(setup) ?? 0), 0).toFixed(2));
 }
 
 function renderWeeklyEquityChart(trades) {

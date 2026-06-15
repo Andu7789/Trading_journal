@@ -1405,12 +1405,16 @@ tbody td {
 
 .opportunity-bar-row {
   display: grid;
-  grid-template-columns: 1fr 16px;
+  grid-template-columns: 1fr 58px;
   align-items: center;
   gap: 6px;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 10px;
+}
+
+.opportunity-bar-row > span {
+  text-align: right;
 }
 
 .opportunity-bar-track {
