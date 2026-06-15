@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.trades (
 
   -- Core
   date            DATE NOT NULL,
+  trade_time      TEXT,
   symbol          VARCHAR(30) NOT NULL,
   direction       VARCHAR(10) NOT NULL CHECK (direction IN ('long', 'short')),
   outcome         VARCHAR(20) CHECK (outcome IN ('win', 'loss', 'breakeven', 'open')),
@@ -148,10 +149,13 @@ CREATE POLICY "Allow all for anon" ON public.notes
   FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================
---  STRATEGY SETUPS — add trade_time column
---  Run this if the column doesn't exist yet:
+--  TRADE TIMES — add columns to existing tables
+--  Run this if either column doesn't exist yet:
 -- =============================================
 ALTER TABLE public.strategy_setups
+  ADD COLUMN IF NOT EXISTS trade_time TEXT;
+
+ALTER TABLE public.trades
   ADD COLUMN IF NOT EXISTS trade_time TEXT;
 
 -- =============================================

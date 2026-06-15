@@ -318,6 +318,16 @@ function setupTradeModal() {
   if (backdrop)  backdrop.onclick  = closeTradeModal;
   if (saveBtn)   saveBtn.onclick   = handleSaveTrade;
 
+  // Populate trade hour dropdown (00-23) once
+  const hourSel = document.getElementById('trade-hour');
+  if (hourSel && !hourSel.options.length) {
+    hourSel.innerHTML = '<option value="">--</option>' +
+      Array.from({length: 24}, (_, i) => {
+        const hour = String(i).padStart(2, '0');
+        return `<option value="${hour}">${hour}</option>`;
+      }).join('');
+  }
+
   // Trade type toggle (Taken / Missed)
   document.querySelectorAll('.trade-type-btn').forEach(btn => {
     btn.onclick = () => {
@@ -616,6 +626,11 @@ async function loadTradeIntoModal(id) {
     applyTradeTypeUI(tradeType);
 
     document.getElementById('trade-date').value        = trade.date || '';
+    if (trade.trade_time) {
+      const [hour, minute] = trade.trade_time.split(':');
+      document.getElementById('trade-hour').value   = hour || '';
+      document.getElementById('trade-minute').value = minute || '';
+    }
     document.getElementById('trade-symbol').value      = trade.symbol || '';
     document.getElementById('trade-direction').value   = trade.direction || '';
     document.getElementById('trade-size').value        = trade.size ?? '';
@@ -741,10 +756,13 @@ async function handleSaveTrade() {
     const riskVal = parseFloatOrNull('trade-risk');
     const rVal    = (pnlVal !== null && riskVal !== null && riskVal > 0)
       ? parseFloat((pnlVal / riskVal).toFixed(2)) : null;
+    const tradeHour   = document.getElementById('trade-hour').value;
+    const tradeMinute = document.getElementById('trade-minute').value;
 
     const tradeData = {
       id:           document.getElementById('trade-id').value || undefined,
       date:         document.getElementById('trade-date').value,
+      trade_time:   (tradeHour && tradeMinute) ? `${tradeHour}:${tradeMinute}` : null,
       symbol:       symbol.toUpperCase(),
       direction,
       size:         parseFloatOrNull('trade-size'),

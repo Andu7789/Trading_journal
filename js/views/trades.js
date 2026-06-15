@@ -278,7 +278,7 @@ function buildTradeRow(t) {
 
   return `
     <tr class="trade-row-main" data-id="${t.id}" style="cursor:pointer" title="Click to expand notes">
-      <td class="td-mono">${formatDate(t.date)}</td>
+      <td class="td-mono">${formatDate(t.date)}${t.trade_time ? ` ${t.trade_time}` : ''}</td>
       <td><strong>${t.symbol}</strong></td>
       <td>${getDirectionBadge(t.direction)}</td>
       <td class="td-mono">${t.size ?? '—'}</td>

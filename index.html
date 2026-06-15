@@ -151,8 +151,18 @@
                   <datalist id="symbol-datalist"></datalist>
                 </div>
                 <div class="form-group">
-                  <label class="form-label required">Date</label>
-                  <input type="date" id="trade-date" class="form-input" required>
+                  <label class="form-label required">Date &amp; Time</label>
+                  <div style="display:flex;gap:5px;align-items:center">
+                    <input type="date" id="trade-date" class="form-input" style="flex:1;min-width:0" required>
+                    <select id="trade-hour" class="form-input" style="width:66px" title="Hour"></select>
+                    <select id="trade-minute" class="form-input" style="width:76px" title="Minute">
+                      <option value="">:--</option>
+                      <option value="00">:00</option>
+                      <option value="15">:15</option>
+                      <option value="30">:30</option>
+                      <option value="45">:45</option>
+                    </select>
+                  </div>
                 </div>
                 <div class="form-group">
                   <label class="form-label required">Direction</label>
