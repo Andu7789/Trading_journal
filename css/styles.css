@@ -1304,6 +1304,128 @@ tbody td {
 .week-day-pnl  { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
 .week-day-trades { font-size: 11px; color: var(--text-muted); }
 
+.opportunity-comparison {
+  margin-bottom: 20px;
+}
+
+.opportunity-comparison-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.opportunity-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.opportunity-summary > div:not(.opportunity-summary-divider):not(.opportunity-capture) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.opportunity-summary-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.opportunity-summary-divider {
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+.opportunity-capture {
+  display: flex;
+  flex-direction: column;
+  padding-left: 12px;
+  margin-left: 4px;
+  border-left: 1px solid var(--border);
+}
+
+.opportunity-capture strong {
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 18px;
+}
+
+.opportunity-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.opportunity-key {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 2px;
+}
+
+.opportunity-key.actual,
+.opportunity-bar.actual { background: var(--profit); }
+
+.opportunity-key.possible,
+.opportunity-bar.possible { background: var(--warning); }
+
+.opportunity-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.opportunity-day {
+  padding: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.opportunity-day-label {
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.opportunity-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.opportunity-bar-row {
+  display: grid;
+  grid-template-columns: 1fr 16px;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.opportunity-bar-track {
+  height: 6px;
+  overflow: hidden;
+  background: var(--bg-input);
+  border-radius: 3px;
+}
+
+.opportunity-bar {
+  height: 100%;
+  min-width: 0;
+  border-radius: 3px;
+}
+
 /* =============================================
    ANALYTICS
    ============================================= */
@@ -1578,4 +1700,6 @@ tbody td {
   .stats-grid  { grid-template-columns: 1fr 1fr; }
   .ratings-grid { grid-template-columns: 1fr; }
   .week-day-grid { grid-template-columns: repeat(2, 1fr); }
+  .opportunity-comparison-header { flex-direction: column; }
+  .opportunity-summary { width: 100%; justify-content: flex-start; }
 }

@@ -1,7 +1,7 @@
 // =============================================
 //  WEEKLY REVIEW VIEW
 // =============================================
-import { getTrades, getJournalEntries } from '../db.js';
+import { getTrades, getJournalEntries, getStrategySetups } from '../db.js';
 import { calcStats, formatCurrency, formatDate, formatDateShort,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          todayString, getWeekRange, addDays, nl2br, getSignalDisplay,
@@ -70,12 +70,13 @@ async function loadWeek() {
   content.innerHTML = `<div class="loading-screen"><div class="loading-spinner"></div></div>`;
 
   try {
-    const [trades, journalEntries] = await Promise.all([
+    const [trades, journalEntries, strategySetups] = await Promise.all([
       getTrades({ startDate: currentWeekStart, endDate: weekEnd }),
-      getJournalEntries(currentWeekStart, weekEnd)
+      getJournalEntries(currentWeekStart, weekEnd),
+      getStrategySetups({ startDate: currentWeekStart, endDate: weekEnd })
     ]);
 
-    content.innerHTML = buildWeeklyContent(currentWeekStart, weekEnd, trades, journalEntries);
+    content.innerHTML = buildWeeklyContent(currentWeekStart, weekEnd, trades, journalEntries, strategySetups);
     wireWeeklyInteractions(trades, journalEntries);
     renderWeeklyEquityChart(trades);
   } catch (err) {
@@ -83,7 +84,7 @@ async function loadWeek() {
   }
 }
 
-function buildWeeklyContent(startDate, endDate, trades, journalEntries) {
+function buildWeeklyContent(startDate, endDate, trades, journalEntries, strategySetups) {
   const today = todayString();
   const stats = calcStats(trades);
 
@@ -91,12 +92,14 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries) {
   for (let i = 0; i < 7; i++) {
     const date = addDays(startDate, i);
     const dayTrades  = trades.filter(t => t.date === date);
+    const dayTakenTrades = dayTrades.filter(t => (t.trade_type || 'taken') === 'taken');
+    const daySetups = strategySetups.filter(s => s.date === date);
     const dayJournal = journalEntries.find(j => j.date === date);
     const dayStats   = calcStats(dayTrades);
     const dayLabel   = new Date(date + 'T00:00:00').toLocaleDateString('en-GB',{ weekday:'short' });
     const dayNum     = new Date(date + 'T00:00:00').getDate();
 
-    days.push({ date, dayTrades, dayJournal, dayStats, dayLabel, dayNum });
+    days.push({ date, dayTrades, dayTakenTrades, daySetups, dayJournal, dayStats, dayLabel, dayNum });
   }
 
   const weekPnl   = stats.totalPnl;
@@ -145,6 +148,8 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries) {
       </div>
     </div>
 
+    ${strategySetups.length ? buildOpportunityComparison(days) : ''}
+
     <!-- Day Cards Grid -->
     <div class="week-day-grid" style="margin-bottom:24px">
       ${days.map(d => buildDayCard(d, today)).join('')}
@@ -155,13 +160,72 @@ function buildWeeklyContent(startDate, endDate, trades, journalEntries) {
       ${days.filter(d => d.dayTrades.length || d.dayJournal).map(d => buildDayDetail(d)).join('')}
     </div>
 
-    ${(!trades.length && !journalEntries.length) ? `
+    ${(!trades.length && !journalEntries.length && !strategySetups.length) ? `
       <div class="empty-state" style="padding:60px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <h3>No activity this week</h3>
         <p>No trades or journal entries found for this week</p>
       </div>
     ` : ''}
+  `;
+}
+
+function buildOpportunityComparison(days) {
+  const actual = days.reduce((sum, d) => sum + d.dayTakenTrades.length, 0);
+  const possible = days.reduce((sum, d) => sum + d.daySetups.length, 0);
+  const captureRate = possible ? Math.round(actual / possible * 100) : null;
+  const activeDays = days.filter(d => d.dayTakenTrades.length || d.daySetups.length);
+  const maxCount = Math.max(1, ...activeDays.flatMap(d => [d.dayTakenTrades.length, d.daySetups.length]));
+
+  return `
+    <div class="card opportunity-comparison">
+      <div class="opportunity-comparison-header">
+        <div>
+          <div class="card-title">Actual vs Possible</div>
+          <div class="card-subtitle">Trades taken compared with Strategy Tracker setups recorded on the same days</div>
+        </div>
+        <div class="opportunity-summary">
+          <div>
+            <span class="opportunity-summary-value text-profit">${actual}</span>
+            <span class="text-xs text-muted">taken</span>
+          </div>
+          <div class="opportunity-summary-divider">/</div>
+          <div>
+            <span class="opportunity-summary-value" style="color:var(--warning)">${possible}</span>
+            <span class="text-xs text-muted">possible</span>
+          </div>
+          <div class="opportunity-capture">
+            <span class="text-xs text-muted">Actual / possible</span>
+            <strong>${captureRate !== null ? captureRate + '%' : '—'}</strong>
+          </div>
+        </div>
+      </div>
+      <div class="opportunity-legend">
+        <span><i class="opportunity-key actual"></i>Actual trades taken</span>
+        <span><i class="opportunity-key possible"></i>Possible setups</span>
+      </div>
+      <div class="opportunity-days">
+        ${activeDays.map(d => {
+          const actualWidth = d.dayTakenTrades.length / maxCount * 100;
+          const possibleWidth = d.daySetups.length / maxCount * 100;
+          return `
+            <div class="opportunity-day">
+              <div class="opportunity-day-label">${d.dayLabel} ${d.dayNum}</div>
+              <div class="opportunity-bars">
+                <div class="opportunity-bar-row">
+                  <div class="opportunity-bar-track"><div class="opportunity-bar actual" style="width:${actualWidth}%"></div></div>
+                  <span>${d.dayTakenTrades.length}</span>
+                </div>
+                <div class="opportunity-bar-row">
+                  <div class="opportunity-bar-track"><div class="opportunity-bar possible" style="width:${possibleWidth}%"></div></div>
+                  <span>${d.daySetups.length}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
   `;
 }
 
