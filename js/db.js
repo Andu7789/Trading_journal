@@ -230,6 +230,101 @@ export async function deleteAllRGameEntries() {
 }
 
 // =============================================
+//  EMOTION MAP
+// =============================================
+
+export async function getEmotionActionTypes() {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { data, error } = await _client
+    .from('emotion_action_types')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveEmotionActionType(actionType) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { id, ...data } = actionType;
+  data.updated_at = new Date().toISOString();
+
+  if (id) {
+    const { data: result, error } = await _client
+      .from('emotion_action_types')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
+  }
+
+  const { data: result, error } = await _client
+    .from('emotion_action_types')
+    .insert(data)
+    .select()
+    .single();
+  if (error) throw error;
+  return result;
+}
+
+export async function deleteEmotionActionType(id) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { error } = await _client.from('emotion_action_types').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getEmotionMapEntries(filters = {}) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  let query = _client
+    .from('emotion_map_entries')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (filters.actionTypeId) query = query.eq('action_type_id', filters.actionTypeId);
+  if (filters.startDate)    query = query.gte('date', filters.startDate);
+  if (filters.endDate)      query = query.lte('date', filters.endDate);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveEmotionMapEntry(entry) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { id, ...data } = entry;
+  data.updated_at = new Date().toISOString();
+
+  if (id) {
+    const { data: result, error } = await _client
+      .from('emotion_map_entries')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
+  }
+
+  const { data: result, error } = await _client
+    .from('emotion_map_entries')
+    .insert(data)
+    .select()
+    .single();
+  if (error) throw error;
+  return result;
+}
+
+export async function deleteEmotionMapEntry(id) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { error } = await _client.from('emotion_map_entries').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// =============================================
 //  JOURNAL ENTRIES
 // =============================================
 
@@ -409,6 +504,8 @@ export async function deleteAllData() {
     _client.from('watchlist_ideas').delete().not('id', 'is', null),
     _client.from('playbook').delete().not('id', 'is', null),
     _client.from('r_game_entries').delete().not('id', 'is', null),
+    _client.from('emotion_map_entries').delete().not('id', 'is', null),
+    _client.from('emotion_action_types').delete().not('id', 'is', null),
   ]);
 }
 

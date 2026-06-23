@@ -1113,6 +1113,181 @@ tbody td {
 }
 
 /* =============================================
+   EMOTION MAP
+   ============================================= */
+.emotion-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+.emotion-map-main,
+.emotion-map-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.emotion-map-stats {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: 0;
+}
+
+.emotion-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.emotion-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.emotion-action-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 10px;
+  min-height: 132px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color var(--transition), background var(--transition), transform var(--transition);
+}
+
+.emotion-action-card:hover {
+  border-color: var(--border-light);
+  background: var(--bg-card-hover);
+  transform: translateY(-1px);
+}
+
+.emotion-action-card.active {
+  border-color: var(--primary);
+  background: var(--primary-dim);
+}
+
+.emotion-action-name {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.emotion-action-count {
+  min-width: 32px;
+  height: 28px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: var(--loss-dim);
+  color: var(--loss);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: center;
+}
+
+.emotion-action-desc,
+.emotion-action-meta {
+  grid-column: 1 / -1;
+  font-size: 12px;
+}
+
+.emotion-action-desc {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.emotion-action-meta {
+  align-self: end;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.emotion-action-delete {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 2px 7px;
+  border: 1px solid rgba(255, 71, 87, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--loss);
+  background: rgba(255, 71, 87, 0.08);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.emotion-entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.emotion-entry-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.emotion-entry-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.emotion-entry-date {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.emotion-map-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.emotion-map-field {
+  min-height: 74px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+}
+
+.emotion-map-field.empty {
+  opacity: 0.62;
+}
+
+.emotion-map-label {
+  margin-bottom: 5px;
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+.emotion-map-value {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* =============================================
    JOURNAL SPECIFIC
    ============================================= */
 .journal-date-nav {
@@ -1878,6 +2053,7 @@ tbody td {
   .week-day-grid  { grid-template-columns: repeat(4, 1fr); }
   .analytics-grid { grid-template-columns: 1fr; }
   .r-game-layout { grid-template-columns: 1fr; }
+  .emotion-map-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
@@ -1900,4 +2076,6 @@ tbody td {
   .sin-add-row { flex-direction: column; }
   .weekly-sins-grid { grid-template-columns: 1fr; }
   .weekly-sins-days { padding-left: 0; padding-top: 12px; border-left: 0; border-top: 1px solid var(--border); }
+  .emotion-action-grid { grid-template-columns: 1fr; }
+  .emotion-map-fields { grid-template-columns: 1fr; }
 }
