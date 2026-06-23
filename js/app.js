@@ -17,6 +17,7 @@ import { renderPlaybook }         from './views/playbook.js';
 import { renderStrategyTracker } from './views/strategy-tracker.js';
 import { renderWatchlist }       from './views/watchlist.js';
 import { renderNotes }           from './views/notes.js';
+import { renderRGame }           from './views/r-game.js';
 
 // ---- Module state ----
 let currentView    = null;
@@ -188,7 +189,7 @@ function setupNavigation() {
     const parts = link.getAttribute('href').slice(1).split('?');
     const view  = parts[0];
     const params = Object.fromEntries(new URLSearchParams(parts[1] || ''));
-    if (['dashboard','journal','trades','weekly','analytics','settings','playbook','strategy-tracker','watchlist','notes'].includes(view)) {
+    if (['dashboard','journal','trades','weekly','analytics','settings','playbook','strategy-tracker','watchlist','notes','r-game'].includes(view)) {
       e.preventDefault();
       history.pushState(null, '', `#${view}`);
       navigate(view, params);
@@ -208,7 +209,7 @@ async function navigate(view, params = {}) {
   const titles = {
     dashboard: 'Dashboard', journal: 'Daily Journal', trades: 'Trade Log',
     weekly: 'Weekly Review', analytics: 'Analytics', settings: 'Settings', playbook: 'Playbook',
-    'strategy-tracker': 'Strategy Tracker', watchlist: 'Watchlist', notes: 'Notes'
+    'strategy-tracker': 'Strategy Tracker', watchlist: 'Watchlist', notes: 'Notes', 'r-game': 'R Game'
   };
   document.getElementById('page-title').textContent = titles[view] || view;
 
@@ -218,6 +219,9 @@ async function navigate(view, params = {}) {
     if (view === 'strategy-tracker') {
       topbarBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Setup`;
       topbarBtn.onclick = () => window._stOpenAddModal?.();
+    } else if (view === 'r-game') {
+      topbarBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add R`;
+      topbarBtn.onclick = () => document.getElementById('r-game-amount')?.focus();
     } else {
       topbarBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Trade`;
       topbarBtn.onclick = () => openTradeModal(null, null);
@@ -245,6 +249,7 @@ async function navigate(view, params = {}) {
       case 'strategy-tracker': await renderStrategyTracker(container); break;
       case 'watchlist':        await renderWatchlist(container); break;
       case 'notes':            await renderNotes(container); break;
+      case 'r-game':           await renderRGame(container); break;
       default:                 await renderDashboard(container);
     }
   } catch (err) {

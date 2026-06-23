@@ -128,6 +128,27 @@ CREATE TABLE IF NOT EXISTS public.notes (
 CREATE INDEX IF NOT EXISTS notes_date_idx ON public.notes (date DESC);
 
 -- =============================================
+--  R GAME TABLES
+-- =============================================
+CREATE TABLE IF NOT EXISTS public.r_game_settings (
+  id          TEXT PRIMARY KEY DEFAULT 'default',
+  created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+  start_date  DATE NOT NULL DEFAULT CURRENT_DATE
+);
+
+CREATE TABLE IF NOT EXISTS public.r_game_entries (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+  date        DATE NOT NULL,
+  amount      DECIMAL(10, 2) NOT NULL,
+  note        TEXT DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS r_game_entries_date_idx ON public.r_game_entries (date DESC);
+
+-- =============================================
 --  ROW LEVEL SECURITY
 --  (Personal app — allow all operations)
 -- =============================================
@@ -135,6 +156,8 @@ ALTER TABLE public.trades         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.playbook        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notes           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.r_game_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.r_game_entries  ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations for anon key (personal use)
 CREATE POLICY "Allow all for anon" ON public.trades
@@ -147,6 +170,12 @@ CREATE POLICY "Allow all for anon" ON public.playbook
   FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Allow all for anon" ON public.notes
+  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all for anon" ON public.r_game_settings
+  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all for anon" ON public.r_game_entries
   FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================

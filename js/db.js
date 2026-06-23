@@ -150,6 +150,86 @@ export async function deleteTrade(id) {
 }
 
 // =============================================
+//  R GAME
+// =============================================
+
+export async function getRGameSettings() {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { data, error } = await _client
+    .from('r_game_settings')
+    .select('*')
+    .eq('id', 'default')
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function saveRGameSettings(settings) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { data, error } = await _client
+    .from('r_game_settings')
+    .upsert({
+      id: 'default',
+      start_date: settings.start_date,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getRGameEntries(filters = {}) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  let query = _client
+    .from('r_game_entries')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (filters.startDate) query = query.gte('date', filters.startDate);
+  if (filters.endDate)   query = query.lte('date', filters.endDate);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveRGameEntry(entryData) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const amount = parseFloat(entryData.amount);
+  if (isNaN(amount)) throw new Error('R amount is required');
+
+  const payload = {
+    date: entryData.date,
+    amount,
+    note: entryData.note || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await _client
+    .from('r_game_entries')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteRGameEntry(id) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { error } = await _client.from('r_game_entries').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteAllRGameEntries() {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { error } = await _client.from('r_game_entries').delete().not('id', 'is', null);
+  if (error) throw error;
+}
+
+// =============================================
 //  JOURNAL ENTRIES
 // =============================================
 
@@ -328,6 +408,7 @@ export async function deleteAllData() {
     _client.from('notes').delete().not('id', 'is', null),
     _client.from('watchlist_ideas').delete().not('id', 'is', null),
     _client.from('playbook').delete().not('id', 'is', null),
+    _client.from('r_game_entries').delete().not('id', 'is', null),
   ]);
 }
 

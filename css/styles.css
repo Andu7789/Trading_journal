@@ -1072,6 +1072,47 @@ tbody td {
 .chart-container { position: relative; height: 200px; }
 
 /* =============================================
+   R GAME
+   ============================================= */
+.r-game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.r-game-main,
+.r-game-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.r-game-stats {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-bottom: 0;
+}
+
+.r-game-lifetime {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.r-game-record {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.r-game-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* =============================================
    JOURNAL SPECIFIC
    ============================================= */
 .journal-date-nav {
@@ -1836,6 +1877,7 @@ tbody td {
   .form-grid-4    { grid-template-columns: 1fr 1fr; }
   .week-day-grid  { grid-template-columns: repeat(4, 1fr); }
   .analytics-grid { grid-template-columns: 1fr; }
+  .r-game-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
