@@ -24,9 +24,15 @@ let baselineSamples = [];
 let baseline = null;
 let lastAlertAt = 0;
 let faceDetector = null;
+let faceLandmarker = null;
+let faceAnalyzerStatus = 'basic';
+let previousLandmarkCenter = null;
 let currentAlert = null;
 
 const SAMPLE_MS = 5000;
+const MEDIAPIPE_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm';
+const MEDIAPIPE_BUNDLE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs';
+const FACE_LANDMARKER_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task';
 const DEFAULT_THRESHOLD = 70;
 const DEFAULT_COOLDOWN_SECONDS = 60;
 const ALERT_SOUND_KEY = 'tj_tilt_alert_sound';
@@ -71,7 +77,7 @@ export async function renderTiltMonitor(container) {
   };
   document.getElementById('tilt-request-notifications').onclick = requestNotifications;
 
-  setupFaceDetector();
+  await setupFaceDetector();
   await loadTiltMonitor();
 }
 
@@ -166,6 +172,8 @@ function buildTiltMonitor() {
                 <div><span>Motion</span><strong id="tilt-motion-score">--</strong></div>
                 <div><span>Light</span><strong id="tilt-brightness-score">--</strong></div>
                 <div><span>Deviation</span><strong id="tilt-tension-score">--</strong></div>
+                <div><span>Expression</span><strong id="tilt-expression-score">--</strong></div>
+                <div><span>Engine</span><strong id="tilt-engine-status">--</strong></div>
               </div>
               <div class="tilt-live-actions">
                 <button class="btn btn-ghost" id="tilt-mark-calm" ${activeSession ? '' : 'disabled'}>Mark Calm</button>
@@ -453,6 +461,7 @@ async function startMonitoring() {
     baselineSamples = [];
     baseline = null;
     previousFrame = null;
+    previousLandmarkCenter = null;
     currentAlert = null;
     lastAlertAt = 0;
 
@@ -527,15 +536,7 @@ async function sampleFrame() {
 }
 
 async function analyzeFrame(video, image) {
-  let faceCount = 0;
-  if (faceDetector) {
-    try {
-      const faces = await faceDetector.detect(video);
-      faceCount = faces.length;
-    } catch {
-      faceCount = 0;
-    }
-  }
+  const faceMetrics = await analyzeFace(video);
 
   const data = image.data;
   let brightness = 0;
@@ -557,10 +558,18 @@ async function analyzeFrame(video, image) {
   previousFrame = new Uint8ClampedArray(data);
 
   const raw = {
-    face_present: faceDetector ? faceCount > 0 : true,
-    face_count: faceDetector ? faceCount : null,
+    face_present: faceMetrics.face_present,
+    face_count: faceMetrics.face_count,
     motion_score: Math.min(100, motion),
     brightness,
+    analyzer: faceMetrics.analyzer,
+    expression_score: faceMetrics.expression_score,
+    brow_tension: faceMetrics.brow_tension,
+    eye_tension: faceMetrics.eye_tension,
+    mouth_tension: faceMetrics.mouth_tension,
+    jaw_activity: faceMetrics.jaw_activity,
+    head_motion: faceMetrics.head_motion,
+    blendshapes: faceMetrics.blendshapes,
   };
 
   if (baselineSamples.length < 6) {
@@ -568,12 +577,31 @@ async function analyzeFrame(video, image) {
     baseline = {
       motion_score: average(baselineSamples, 'motion_score'),
       brightness: average(baselineSamples, 'brightness'),
+      expression_score: average(baselineSamples, 'expression_score'),
+      brow_tension: average(baselineSamples, 'brow_tension'),
+      eye_tension: average(baselineSamples, 'eye_tension'),
+      mouth_tension: average(baselineSamples, 'mouth_tension'),
+      jaw_activity: average(baselineSamples, 'jaw_activity'),
+      head_motion: average(baselineSamples, 'head_motion'),
     };
   }
 
   const motionDelta = baseline ? Math.abs(raw.motion_score - baseline.motion_score) : 0;
   const lightDelta = baseline ? Math.abs(raw.brightness - baseline.brightness) : 0;
-  const tension = Math.min(100, Math.round((motionDelta * 0.9) + (lightDelta * 0.45)));
+  const expressionDelta = baseline ? Math.max(0, raw.expression_score - baseline.expression_score) : 0;
+  const browDelta = baseline ? Math.max(0, raw.brow_tension - baseline.brow_tension) : 0;
+  const eyeDelta = baseline ? Math.max(0, raw.eye_tension - baseline.eye_tension) : 0;
+  const mouthDelta = baseline ? Math.max(0, raw.mouth_tension - baseline.mouth_tension) : 0;
+  const headDelta = baseline ? Math.max(0, raw.head_motion - baseline.head_motion) : 0;
+  const tension = Math.min(100, Math.round(
+    (motionDelta * 0.45) +
+    (lightDelta * 0.2) +
+    (expressionDelta * 0.8) +
+    (browDelta * 0.35) +
+    (eyeDelta * 0.25) +
+    (mouthDelta * 0.25) +
+    (headDelta * 0.35)
+  ));
 
   return {
     ...raw,
@@ -582,10 +610,142 @@ async function analyzeFrame(video, image) {
   };
 }
 
+async function analyzeFace(video) {
+  if (faceLandmarker) {
+    try {
+      const result = faceLandmarker.detectForVideo(video, performance.now());
+      const landmarks = result.faceLandmarks || [];
+      const blendshapeGroups = result.faceBlendshapes || [];
+      const blendshapeMap = blendshapeGroups[0]?.categories
+        ? mapBlendshapes(blendshapeGroups[0].categories)
+        : {};
+      const landmarkMotion = landmarks[0] ? calculateLandmarkMotion(landmarks[0]) : 0;
+
+      return {
+        face_present: landmarks.length > 0,
+        face_count: landmarks.length,
+        analyzer: 'MediaPipe',
+        ...calculateExpressionMetrics(blendshapeMap, landmarkMotion),
+      };
+    } catch (err) {
+      console.warn('MediaPipe face analysis failed:', err);
+    }
+  }
+
+  let faceCount = 0;
+  if (faceDetector) {
+    try {
+      const faces = await faceDetector.detect(video);
+      faceCount = faces.length;
+    } catch {
+      faceCount = 0;
+    }
+  }
+
+  return {
+    face_present: faceDetector ? faceCount > 0 : true,
+    face_count: faceDetector ? faceCount : null,
+    analyzer: faceDetector ? 'FaceDetector' : 'Frame',
+    expression_score: 0,
+    brow_tension: 0,
+    eye_tension: 0,
+    mouth_tension: 0,
+    jaw_activity: 0,
+    head_motion: 0,
+    blendshapes: {},
+  };
+}
+
+function mapBlendshapes(categories) {
+  return categories.reduce((acc, item) => {
+    acc[item.categoryName] = Math.round((item.score || 0) * 100);
+    return acc;
+  }, {});
+}
+
+function calculateExpressionMetrics(blendshapes, landmarkMotion) {
+  const browTension = Math.max(
+    score(blendshapes, 'browDownLeft'),
+    score(blendshapes, 'browDownRight'),
+    score(blendshapes, 'browInnerUp') * 0.75
+  );
+  const eyeTension = Math.max(
+    score(blendshapes, 'eyeSquintLeft'),
+    score(blendshapes, 'eyeSquintRight'),
+    score(blendshapes, 'eyeBlinkLeft') * 0.5,
+    score(blendshapes, 'eyeBlinkRight') * 0.5,
+    score(blendshapes, 'eyeWideLeft') * 0.55,
+    score(blendshapes, 'eyeWideRight') * 0.55
+  );
+  const mouthTension = Math.max(
+    score(blendshapes, 'mouthPressLeft'),
+    score(blendshapes, 'mouthPressRight'),
+    score(blendshapes, 'mouthPucker') * 0.7,
+    score(blendshapes, 'mouthFunnel') * 0.65,
+    score(blendshapes, 'mouthShrugUpper') * 0.65,
+    score(blendshapes, 'mouthShrugLower') * 0.65
+  );
+  const jawActivity = Math.max(
+    score(blendshapes, 'jawOpen') * 0.75,
+    score(blendshapes, 'jawForward'),
+    score(blendshapes, 'jawLeft'),
+    score(blendshapes, 'jawRight')
+  );
+  const headMotion = Math.min(100, Math.round(landmarkMotion));
+  const expressionScore = Math.min(100, Math.round(
+    browTension * 0.32 +
+    eyeTension * 0.22 +
+    mouthTension * 0.28 +
+    jawActivity * 0.1 +
+    headMotion * 0.08
+  ));
+
+  return {
+    expression_score: expressionScore,
+    brow_tension: Math.round(browTension),
+    eye_tension: Math.round(eyeTension),
+    mouth_tension: Math.round(mouthTension),
+    jaw_activity: Math.round(jawActivity),
+    head_motion: headMotion,
+    blendshapes,
+  };
+}
+
+function calculateLandmarkMotion(landmarks) {
+  const keyPoints = [1, 10, 152, 234, 454]
+    .map(index => landmarks[index])
+    .filter(Boolean);
+  if (!keyPoints.length) return 0;
+
+  const center = keyPoints.reduce((acc, point) => ({
+    x: acc.x + point.x / keyPoints.length,
+    y: acc.y + point.y / keyPoints.length,
+    z: acc.z + (point.z || 0) / keyPoints.length,
+  }), { x: 0, y: 0, z: 0 });
+
+  if (!previousLandmarkCenter) {
+    previousLandmarkCenter = center;
+    return 0;
+  }
+
+  const distance = Math.sqrt(
+    Math.pow(center.x - previousLandmarkCenter.x, 2) +
+    Math.pow(center.y - previousLandmarkCenter.y, 2) +
+    Math.pow((center.z || 0) - (previousLandmarkCenter.z || 0), 2)
+  );
+  previousLandmarkCenter = center;
+  return Math.min(100, distance * 2600);
+}
+
+function score(blendshapes, key) {
+  return blendshapes[key] || 0;
+}
+
 function calculateRisk(metrics) {
   let risk = 12;
-  risk += metrics.tension_score * 0.65;
-  risk += metrics.motion_score * 0.25;
+  risk += metrics.tension_score * 0.55;
+  risk += metrics.motion_score * 0.16;
+  risk += metrics.expression_score * 0.28;
   if (metrics.face_present === false) risk += 12;
   if (!metrics.baseline_ready) risk = Math.min(risk, 35);
   return Math.max(0, Math.min(100, Math.round(risk)));
@@ -815,6 +975,8 @@ function updateLiveReadout(metrics, risk) {
   const motionScore = document.getElementById('tilt-motion-score');
   const brightnessScore = document.getElementById('tilt-brightness-score');
   const tensionScore = document.getElementById('tilt-tension-score');
+  const expressionScore = document.getElementById('tilt-expression-score');
+  const engineStatus = document.getElementById('tilt-engine-status');
 
   if (riskFill) riskFill.style.width = `${risk}%`;
   if (riskLabelEl) riskLabelEl.textContent = riskLabel(risk);
@@ -823,6 +985,8 @@ function updateLiveReadout(metrics, risk) {
   if (motionScore) motionScore.textContent = metrics.motion_score;
   if (brightnessScore) brightnessScore.textContent = metrics.brightness;
   if (tensionScore) tensionScore.textContent = metrics.tension_score;
+  if (expressionScore) expressionScore.textContent = metrics.expression_score ?? '--';
+  if (engineStatus) engineStatus.textContent = metrics.analyzer || faceAnalyzerStatus;
 }
 
 function updateTopbarSessionButton() {
@@ -833,14 +997,42 @@ function updateTopbarSessionButton() {
   btn.classList.toggle('btn-primary', !activeSession);
 }
 
-function setupFaceDetector() {
+async function setupFaceDetector() {
+  if (!faceLandmarker) {
+    try {
+      const vision = await withTimeout(import(MEDIAPIPE_BUNDLE_URL), 4000);
+      const fileset = await withTimeout(vision.FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_URL), 4000);
+      faceLandmarker = await withTimeout(vision.FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: FACE_LANDMARKER_MODEL_URL },
+        runningMode: 'VIDEO',
+        numFaces: 1,
+        outputFaceBlendshapes: true,
+      }), 6000);
+      faceAnalyzerStatus = 'MediaPipe';
+      return;
+    } catch (err) {
+      console.warn('MediaPipe Face Landmarker unavailable, using fallback:', err);
+      faceLandmarker = null;
+    }
+  }
+
   if ('FaceDetector' in window && !faceDetector) {
     try {
       faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+      faceAnalyzerStatus = 'FaceDetector';
     } catch {
       faceDetector = null;
     }
   }
+
+  if (!faceDetector) faceAnalyzerStatus = 'Frame';
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out')), ms)),
+  ]);
 }
 
 async function requestNotifications() {
@@ -900,6 +1092,10 @@ function clamp(value, min, max) {
 function describeRiskReason(metrics) {
   const parts = [];
   if (metrics.tension_score >= 55) parts.push('tension above baseline');
+  if (metrics.expression_score >= 45) parts.push('expression tension elevated');
+  if (metrics.brow_tension >= 45) parts.push('brow tension');
+  if (metrics.mouth_tension >= 45) parts.push('mouth/jaw tension');
+  if (metrics.head_motion >= 45) parts.push('head movement shifted');
   if (metrics.motion_score >= 45) parts.push('movement changed sharply');
   if (metrics.face_present === false) parts.push('face not visible');
   if (metrics.brightness <= 45 || metrics.brightness >= 210) parts.push('lighting shifted');
