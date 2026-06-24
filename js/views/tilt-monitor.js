@@ -28,6 +28,10 @@ let faceDetector = null;
 const SAMPLE_MS = 5000;
 const ALERT_COOLDOWN_MS = 60000;
 const DEFAULT_THRESHOLD = 70;
+const ALERT_SOUND_KEY = 'tj_tilt_alert_sound';
+const TELEGRAM_ENABLED_KEY = 'tj_tilt_telegram_enabled';
+const TELEGRAM_TOKEN_KEY = 'tj_tilt_telegram_token';
+const TELEGRAM_CHAT_ID_KEY = 'tj_tilt_telegram_chat_id';
 const LABELS = [
   { value: 'calm', label: 'Calm' },
   { value: 'focused', label: 'Focused' },
@@ -189,6 +193,16 @@ function buildTiltMonitor() {
         <div class="card">
           <div class="card-header">
             <div>
+              <div class="card-title">Alert Channels</div>
+              <div class="card-subtitle">Sound locally and message Telegram on high risk</div>
+            </div>
+          </div>
+          ${buildAlertSettings()}
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
               <div class="card-title">Recent Sessions</div>
               <div class="card-subtitle">Review labels and alerts</div>
             </div>
@@ -196,6 +210,37 @@ function buildTiltMonitor() {
           ${buildSessionList()}
         </div>
       </div>
+    </div>
+  `;
+}
+
+function buildAlertSettings() {
+  const soundEnabled = localStorage.getItem(ALERT_SOUND_KEY) !== 'off';
+  const telegramEnabled = localStorage.getItem(TELEGRAM_ENABLED_KEY) === 'on';
+  const token = localStorage.getItem(TELEGRAM_TOKEN_KEY) || '';
+  const chatId = localStorage.getItem(TELEGRAM_CHAT_ID_KEY) || '';
+
+  return `
+    <label class="checkbox-row mb-16">
+      <input type="checkbox" id="tilt-alert-sound" ${soundEnabled ? 'checked' : ''}>
+      <span>Play alert sound</span>
+    </label>
+    <label class="checkbox-row mb-16">
+      <input type="checkbox" id="tilt-telegram-enabled" ${telegramEnabled ? 'checked' : ''}>
+      <span>Send Telegram message</span>
+    </label>
+    <div class="form-group mb-16">
+      <label class="form-label">Bot token</label>
+      <input type="password" id="tilt-telegram-token" class="form-input" placeholder="123456:ABC..." value="${escapeHtml(token)}">
+      <span class="form-hint">Create a bot with BotFather, then paste the token here. Stored in this browser only.</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Chat ID</label>
+      <input type="text" id="tilt-telegram-chat-id" class="form-input" placeholder="123456789" value="${escapeHtml(chatId)}">
+    </div>
+    <div class="tilt-live-actions mt-16">
+      <button class="btn btn-ghost" id="tilt-save-alert-settings">Save Alerts</button>
+      <button class="btn btn-ghost" id="tilt-test-alerts">Test Alert</button>
     </div>
   `;
 }
@@ -307,6 +352,8 @@ function wireTiltMonitor() {
   document.getElementById('tilt-save-label')?.addEventListener('click', handleSaveLabel);
   document.getElementById('tilt-mark-calm')?.addEventListener('click', () => quickLabel('calm', 2, 'Marked calm during live session'));
   document.getElementById('tilt-mark-tilt')?.addEventListener('click', () => quickLabel('tilt', 8, 'Marked tilt during live session'));
+  document.getElementById('tilt-save-alert-settings')?.addEventListener('click', saveAlertSettings);
+  document.getElementById('tilt-test-alerts')?.addEventListener('click', testAlertChannels);
 
   document.querySelectorAll('.tilt-session-item').forEach(btn => {
     btn.onclick = async () => {
@@ -494,8 +541,99 @@ async function triggerTiltAlert(risk) {
   }
 
   showToast(message, 'warning');
+  playAlertSound();
+  sendTelegramAlert(risk, message);
+
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('Tilt risk rising', { body: message });
+  }
+}
+
+function saveAlertSettings() {
+  const soundEnabled = document.getElementById('tilt-alert-sound')?.checked;
+  const telegramEnabled = document.getElementById('tilt-telegram-enabled')?.checked;
+  const token = document.getElementById('tilt-telegram-token')?.value.trim() || '';
+  const chatId = document.getElementById('tilt-telegram-chat-id')?.value.trim() || '';
+
+  localStorage.setItem(ALERT_SOUND_KEY, soundEnabled ? 'on' : 'off');
+  localStorage.setItem(TELEGRAM_ENABLED_KEY, telegramEnabled ? 'on' : 'off');
+  if (token) localStorage.setItem(TELEGRAM_TOKEN_KEY, token);
+  else localStorage.removeItem(TELEGRAM_TOKEN_KEY);
+  if (chatId) localStorage.setItem(TELEGRAM_CHAT_ID_KEY, chatId);
+  else localStorage.removeItem(TELEGRAM_CHAT_ID_KEY);
+
+  showToast('Alert settings saved', 'success');
+}
+
+async function testAlertChannels() {
+  saveAlertSettings();
+  playAlertSound();
+  const ok = await sendTelegramAlert(88, 'Test alert from Tilt Monitor.');
+  showToast(ok ? 'Test alert sent' : 'Sound tested. Telegram not sent; check token/chat ID.', ok ? 'success' : 'warning');
+}
+
+function playAlertSound() {
+  if (localStorage.getItem(ALERT_SOUND_KEY) === 'off') return;
+
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+
+    const ctx = new AudioContext();
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
+    gain.connect(ctx.destination);
+
+    [660, 440].forEach((freq, index) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + index * 0.18);
+      osc.connect(gain);
+      osc.start(ctx.currentTime + index * 0.18);
+      osc.stop(ctx.currentTime + index * 0.18 + 0.16);
+    });
+
+    setTimeout(() => ctx.close(), 700);
+  } catch (err) {
+    console.warn('Alert sound failed:', err);
+  }
+}
+
+async function sendTelegramAlert(risk, message) {
+  if (localStorage.getItem(TELEGRAM_ENABLED_KEY) !== 'on') return false;
+
+  const token = localStorage.getItem(TELEGRAM_TOKEN_KEY);
+  const chatId = localStorage.getItem(TELEGRAM_CHAT_ID_KEY);
+  if (!token || !chatId) return false;
+
+  const text = [
+    'Tilt Monitor alert',
+    `Risk score: ${risk}`,
+    message,
+    `Time: ${new Date().toLocaleString('en-GB')}`,
+  ].join('\n');
+
+  try {
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        disable_notification: false,
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn('Telegram alert failed:', await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Telegram alert failed:', err);
+    return false;
   }
 }
 
