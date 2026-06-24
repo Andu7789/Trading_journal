@@ -325,6 +325,110 @@ export async function deleteEmotionMapEntry(id) {
 }
 
 // =============================================
+//  TILT MONITOR
+// =============================================
+
+export async function getTiltMonitorSessions(filters = {}) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  let query = _client
+    .from('tilt_monitor_sessions')
+    .select('*')
+    .order('started_at', { ascending: false });
+
+  if (filters.date) query = query.eq('date', filters.date);
+  if (filters.limit) query = query.limit(filters.limit);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getTiltMonitorSessionDetails(sessionId) {
+  if (!_client) throw new Error('Not connected to Supabase');
+
+  const [samplesRes, labelsRes, alertsRes] = await Promise.all([
+    _client.from('tilt_monitor_samples').select('*').eq('session_id', sessionId).order('captured_at', { ascending: true }),
+    _client.from('tilt_monitor_labels').select('*').eq('session_id', sessionId).order('labeled_at', { ascending: true }),
+    _client.from('tilt_monitor_alerts').select('*').eq('session_id', sessionId).order('alerted_at', { ascending: true }),
+  ]);
+
+  if (samplesRes.error) throw samplesRes.error;
+  if (labelsRes.error) throw labelsRes.error;
+  if (alertsRes.error) throw alertsRes.error;
+
+  return {
+    samples: samplesRes.data || [],
+    labels: labelsRes.data || [],
+    alerts: alertsRes.data || [],
+  };
+}
+
+export async function saveTiltMonitorSession(session) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { id, ...data } = session;
+  data.updated_at = new Date().toISOString();
+
+  if (id) {
+    const { data: result, error } = await _client
+      .from('tilt_monitor_sessions')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
+  }
+
+  const { data: result, error } = await _client
+    .from('tilt_monitor_sessions')
+    .insert(data)
+    .select()
+    .single();
+  if (error) throw error;
+  return result;
+}
+
+export async function saveTiltMonitorSample(sample) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { data, error } = await _client
+    .from('tilt_monitor_samples')
+    .insert(sample)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function saveTiltMonitorLabel(label) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { data, error } = await _client
+    .from('tilt_monitor_labels')
+    .insert(label)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function saveTiltMonitorAlert(alert) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { data, error } = await _client
+    .from('tilt_monitor_alerts')
+    .insert(alert)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteTiltMonitorSession(id) {
+  if (!_client) throw new Error('Not connected to Supabase');
+  const { error } = await _client.from('tilt_monitor_sessions').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// =============================================
 //  JOURNAL ENTRIES
 // =============================================
 
@@ -506,6 +610,7 @@ export async function deleteAllData() {
     _client.from('r_game_entries').delete().not('id', 'is', null),
     _client.from('emotion_map_entries').delete().not('id', 'is', null),
     _client.from('emotion_action_types').delete().not('id', 'is', null),
+    _client.from('tilt_monitor_sessions').delete().not('id', 'is', null),
   ]);
 }
 

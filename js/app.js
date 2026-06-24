@@ -19,6 +19,7 @@ import { renderWatchlist }       from './views/watchlist.js';
 import { renderNotes }           from './views/notes.js';
 import { renderRGame }           from './views/r-game.js';
 import { renderEmotionMap }      from './views/emotion-map.js';
+import { renderTiltMonitor }     from './views/tilt-monitor.js';
 
 // ---- Module state ----
 let currentView    = null;
@@ -190,7 +191,7 @@ function setupNavigation() {
     const parts = link.getAttribute('href').slice(1).split('?');
     const view  = parts[0];
     const params = Object.fromEntries(new URLSearchParams(parts[1] || ''));
-    if (['dashboard','journal','trades','weekly','analytics','settings','playbook','strategy-tracker','watchlist','notes','r-game','emotion-map'].includes(view)) {
+    if (['dashboard','journal','trades','weekly','analytics','settings','playbook','strategy-tracker','watchlist','notes','r-game','emotion-map','tilt-monitor'].includes(view)) {
       e.preventDefault();
       history.pushState(null, '', `#${view}`);
       navigate(view, params);
@@ -210,7 +211,7 @@ async function navigate(view, params = {}) {
   const titles = {
     dashboard: 'Dashboard', journal: 'Daily Journal', trades: 'Trade Log',
     weekly: 'Weekly Review', analytics: 'Analytics', settings: 'Settings', playbook: 'Playbook',
-    'strategy-tracker': 'Strategy Tracker', watchlist: 'Watchlist', notes: 'Notes', 'r-game': 'R Game', 'emotion-map': 'Emotion Map'
+    'strategy-tracker': 'Strategy Tracker', watchlist: 'Watchlist', notes: 'Notes', 'r-game': 'R Game', 'emotion-map': 'Emotion Map', 'tilt-monitor': 'Tilt Monitor'
   };
   document.getElementById('page-title').textContent = titles[view] || view;
 
@@ -226,6 +227,9 @@ async function navigate(view, params = {}) {
     } else if (view === 'emotion-map') {
       topbarBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Record Action`;
       topbarBtn.onclick = () => document.getElementById('emotion-trigger_signal')?.focus();
+    } else if (view === 'tilt-monitor') {
+      topbarBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/></svg> Start Monitor`;
+      topbarBtn.onclick = () => document.getElementById('tilt-session-toggle')?.click();
     } else {
       topbarBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Trade`;
       topbarBtn.onclick = () => openTradeModal(null, null);
@@ -255,6 +259,7 @@ async function navigate(view, params = {}) {
       case 'notes':            await renderNotes(container); break;
       case 'r-game':           await renderRGame(container); break;
       case 'emotion-map':      await renderEmotionMap(container); break;
+      case 'tilt-monitor':     await renderTiltMonitor(container); break;
       default:                 await renderDashboard(container);
     }
   } catch (err) {

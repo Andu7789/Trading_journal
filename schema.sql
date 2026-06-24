@@ -189,6 +189,60 @@ VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- =============================================
+--  TILT MONITOR TABLES
+-- =============================================
+CREATE TABLE IF NOT EXISTS public.tilt_monitor_sessions (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+  date        DATE NOT NULL,
+  started_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ended_at    TIMESTAMPTZ,
+  baseline    JSONB DEFAULT '{}'::jsonb,
+  settings    JSONB DEFAULT '{}'::jsonb,
+  notes       TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS public.tilt_monitor_samples (
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at     TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  session_id     UUID NOT NULL REFERENCES public.tilt_monitor_sessions(id) ON DELETE CASCADE,
+  captured_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  risk_score     SMALLINT DEFAULT 0 CHECK (risk_score BETWEEN 0 AND 100),
+  face_present   BOOLEAN DEFAULT TRUE,
+  face_count     INTEGER,
+  motion_score   DECIMAL(10, 2),
+  brightness     DECIMAL(10, 2),
+  tension_score  DECIMAL(10, 2),
+  metrics        JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS public.tilt_monitor_labels (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  session_id  UUID NOT NULL REFERENCES public.tilt_monitor_sessions(id) ON DELETE CASCADE,
+  labeled_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  label       TEXT NOT NULL CHECK (label IN ('calm', 'focused', 'frustrated', 'fomo', 'revenge', 'tilt', 'false_positive')),
+  intensity   SMALLINT DEFAULT 5 CHECK (intensity BETWEEN 1 AND 10),
+  notes       TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS public.tilt_monitor_alerts (
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at    TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  session_id    UUID NOT NULL REFERENCES public.tilt_monitor_sessions(id) ON DELETE CASCADE,
+  alerted_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  risk_score    SMALLINT DEFAULT 0 CHECK (risk_score BETWEEN 0 AND 100),
+  message       TEXT DEFAULT '',
+  acknowledged  BOOLEAN DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS tilt_monitor_sessions_date_idx ON public.tilt_monitor_sessions (date DESC, started_at DESC);
+CREATE INDEX IF NOT EXISTS tilt_monitor_samples_session_time_idx ON public.tilt_monitor_samples (session_id, captured_at ASC);
+CREATE INDEX IF NOT EXISTS tilt_monitor_labels_session_time_idx ON public.tilt_monitor_labels (session_id, labeled_at ASC);
+CREATE INDEX IF NOT EXISTS tilt_monitor_alerts_session_time_idx ON public.tilt_monitor_alerts (session_id, alerted_at ASC);
+
+-- =============================================
 --  ROW LEVEL SECURITY
 --  (Personal app — allow all operations)
 -- =============================================
@@ -200,6 +254,10 @@ ALTER TABLE public.r_game_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.r_game_entries  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.emotion_action_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.emotion_map_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tilt_monitor_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tilt_monitor_samples ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tilt_monitor_labels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tilt_monitor_alerts ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations for anon key (personal use)
 CREATE POLICY "Allow all for anon" ON public.trades
@@ -224,6 +282,18 @@ CREATE POLICY "Allow all for anon" ON public.emotion_action_types
   FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Allow all for anon" ON public.emotion_map_entries
+  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all for anon" ON public.tilt_monitor_sessions
+  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all for anon" ON public.tilt_monitor_samples
+  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all for anon" ON public.tilt_monitor_labels
+  FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow all for anon" ON public.tilt_monitor_alerts
   FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================

@@ -1,0 +1,633 @@
+// =============================================
+//  TILT MONITOR VIEW
+// =============================================
+import {
+  getTiltMonitorSessions,
+  getTiltMonitorSessionDetails,
+  saveTiltMonitorSession,
+  saveTiltMonitorSample,
+  saveTiltMonitorLabel,
+  saveTiltMonitorAlert,
+  deleteTiltMonitorSession,
+} from '../db.js';
+import { showToast } from '../app.js';
+import { escapeHtml, formatDate, todayString } from '../utils.js';
+
+let sessions = [];
+let selectedSessionId = null;
+let selectedDetails = { samples: [], labels: [], alerts: [] };
+let activeSession = null;
+let mediaStream = null;
+let sampleTimer = null;
+let previousFrame = null;
+let baselineSamples = [];
+let baseline = null;
+let lastAlertAt = 0;
+let faceDetector = null;
+
+const SAMPLE_MS = 5000;
+const ALERT_COOLDOWN_MS = 60000;
+const DEFAULT_THRESHOLD = 70;
+const LABELS = [
+  { value: 'calm', label: 'Calm' },
+  { value: 'focused', label: 'Focused' },
+  { value: 'frustrated', label: 'Frustrated' },
+  { value: 'fomo', label: 'FOMO' },
+  { value: 'revenge', label: 'Revenge' },
+  { value: 'tilt', label: 'Tilt' },
+  { value: 'false_positive', label: 'False positive' },
+];
+
+export async function renderTiltMonitor(container) {
+  document.getElementById('page-title').textContent = 'Tilt Monitor';
+
+  container.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>Tilt Monitor</h1>
+        <div class="page-header-sub">Local webcam signals, manual labels, and alert history for trading state review</div>
+      </div>
+      <div class="emotion-header-actions">
+        <button class="btn btn-ghost" id="tilt-request-notifications">Enable Alerts</button>
+        <button class="btn btn-primary" id="tilt-session-toggle">Start Monitoring</button>
+      </div>
+    </div>
+
+    <div id="tilt-monitor-content">
+      <div class="loading-screen"><div class="loading-spinner"></div></div>
+    </div>
+  `;
+
+  document.getElementById('tilt-session-toggle').onclick = () => {
+    if (activeSession) stopMonitoring();
+    else startMonitoring();
+  };
+  document.getElementById('tilt-request-notifications').onclick = requestNotifications;
+
+  setupFaceDetector();
+  await loadTiltMonitor();
+}
+
+async function loadTiltMonitor() {
+  const content = document.getElementById('tilt-monitor-content');
+  if (!content) return;
+
+  try {
+    sessions = await getTiltMonitorSessions({ limit: 20 });
+    if (!selectedSessionId || !sessions.some(session => session.id === selectedSessionId)) {
+      selectedSessionId = sessions[0]?.id || null;
+    }
+    selectedDetails = selectedSessionId
+      ? await getTiltMonitorSessionDetails(selectedSessionId)
+      : { samples: [], labels: [], alerts: [] };
+
+    content.innerHTML = buildTiltMonitor();
+    wireTiltMonitor();
+    attachVideoStream();
+  } catch (err) {
+    content.innerHTML = `
+      <div class="empty-state">
+        <h3 class="text-loss">Tilt Monitor needs its database tables</h3>
+        <p>${escapeHtml(err.message)}</p>
+        <p class="text-muted mt-8">Run the tilt monitor migration in Supabase, then reload this page.</p>
+      </div>
+    `;
+  }
+}
+
+function buildTiltMonitor() {
+  const session = getSelectedSession();
+  const activeRisk = getLatestRisk();
+  const totalLabels = selectedDetails.labels.length;
+  const totalAlerts = selectedDetails.alerts.length;
+  const avgRisk = averageRisk(selectedDetails.samples);
+
+  return `
+    <div class="tilt-monitor-layout">
+      <div class="tilt-monitor-main">
+        <div class="stats-grid emotion-map-stats">
+          <div class="stat-card ${activeRisk >= DEFAULT_THRESHOLD ? 'loss' : 'primary'}">
+            <div class="stat-label">Live Risk</div>
+            <div class="stat-value ${activeRisk >= DEFAULT_THRESHOLD ? 'text-loss' : 'text-primary'}">${activeRisk}</div>
+            <div class="stat-sub">${activeSession ? 'Monitoring now' : 'Start a session to sample'}</div>
+          </div>
+          <div class="stat-card warning">
+            <div class="stat-label">Session Avg</div>
+            <div class="stat-value text-warning">${avgRisk}</div>
+            <div class="stat-sub">${selectedDetails.samples.length} saved samples</div>
+          </div>
+          <div class="stat-card secondary">
+            <div class="stat-label">Labels</div>
+            <div class="stat-value text-secondary">${totalLabels}</div>
+            <div class="stat-sub">Manual training signals</div>
+          </div>
+          <div class="stat-card loss">
+            <div class="stat-label">Alerts</div>
+            <div class="stat-value text-loss">${totalAlerts}</div>
+            <div class="stat-sub">High-risk moments</div>
+          </div>
+        </div>
+
+        <div class="card tilt-live-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Live Monitor</div>
+              <div class="card-subtitle">${activeSession ? 'Camera is sampled locally every 5 seconds' : 'Start monitoring when your trading session begins'}</div>
+            </div>
+            <span class="tilt-status-pill ${activeSession ? 'active' : ''}">${activeSession ? 'Active' : 'Idle'}</span>
+          </div>
+          <div class="tilt-live-grid">
+            <div class="tilt-video-wrap">
+              <video id="tilt-video" autoplay playsinline muted></video>
+              <canvas id="tilt-canvas" width="160" height="120"></canvas>
+              <div class="tilt-video-empty">${activeSession ? 'Waiting for camera' : 'Camera off'}</div>
+            </div>
+            <div class="tilt-live-panel">
+              <div class="tilt-risk-meter">
+                <div class="tilt-risk-fill" id="tilt-risk-fill" style="width:${activeRisk}%"></div>
+              </div>
+              <div class="tilt-live-readout">
+                <span id="tilt-risk-label">${riskLabel(activeRisk)}</span>
+                <strong id="tilt-risk-number">${activeRisk}</strong>
+              </div>
+              <div class="tilt-signal-grid">
+                <div><span>Face</span><strong id="tilt-face-status">--</strong></div>
+                <div><span>Motion</span><strong id="tilt-motion-score">--</strong></div>
+                <div><span>Light</span><strong id="tilt-brightness-score">--</strong></div>
+                <div><span>Deviation</span><strong id="tilt-tension-score">--</strong></div>
+              </div>
+              <div class="tilt-live-actions">
+                <button class="btn btn-ghost" id="tilt-mark-calm" ${activeSession ? '' : 'disabled'}>Mark Calm</button>
+                <button class="btn btn-danger" id="tilt-mark-tilt" ${activeSession ? '' : 'disabled'}>Mark Tilt</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">${session ? formatSessionTitle(session) : 'No sessions yet'}</div>
+              <div class="card-subtitle">${session ? sessionSummary(session) : 'Your monitored sessions will appear here'}</div>
+            </div>
+          </div>
+          ${buildTimeline()}
+        </div>
+      </div>
+
+      <div class="tilt-monitor-side">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Label Current Moment</div>
+              <div class="card-subtitle">This is the training data that matters</div>
+            </div>
+          </div>
+          ${buildLabelForm()}
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Recent Sessions</div>
+              <div class="card-subtitle">Review labels and alerts</div>
+            </div>
+          </div>
+          ${buildSessionList()}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function buildLabelForm() {
+  const disabled = activeSession ? '' : 'disabled';
+  return `
+    <div class="form-group mb-16">
+      <label class="form-label">State</label>
+      <select id="tilt-label-type" class="form-select" ${disabled}>
+        ${LABELS.map(item => `<option value="${item.value}">${item.label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group mb-16">
+      <label class="form-label">Intensity</label>
+      <input type="range" id="tilt-label-intensity" min="1" max="10" value="5" ${disabled}>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea id="tilt-label-notes" class="form-textarea" rows="3" placeholder="What happened? Loss streak, FOMO, revenge impulse, felt fine, etc." ${disabled}></textarea>
+    </div>
+    <button class="btn btn-primary btn-block mt-16" id="tilt-save-label" ${disabled}>Save Label</button>
+  `;
+}
+
+function buildSessionList() {
+  if (!sessions.length) {
+    return `
+      <div class="empty-state" style="padding:24px 0">
+        <p>No monitor sessions yet.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="tilt-session-list">
+      ${sessions.map(session => `
+        <button class="tilt-session-item ${session.id === selectedSessionId ? 'active' : ''}" data-id="${session.id}">
+          <span>${formatSessionTitle(session)}</span>
+          <small>${sessionSummary(session)}</small>
+        </button>
+      `).join('')}
+    </div>
+    ${selectedSessionId ? '<button class="btn btn-danger btn-block mt-16" id="tilt-delete-session">Delete Selected</button>' : ''}
+  `;
+}
+
+function buildTimeline() {
+  if (!selectedSessionId) {
+    return `
+      <div class="empty-state" style="padding:40px">
+        <h3>No tilt monitor data yet</h3>
+        <p>Start a session, label moments, and alerts will become reviewable here.</p>
+      </div>
+    `;
+  }
+
+  const rows = [
+    ...selectedDetails.labels.map(item => ({ type: 'label', time: item.labeled_at, item })),
+    ...selectedDetails.alerts.map(item => ({ type: 'alert', time: item.alerted_at, item })),
+  ].sort((a, b) => new Date(b.time) - new Date(a.time));
+
+  if (!rows.length) {
+    return `
+      <div class="empty-state" style="padding:40px">
+        <h3>No labels or alerts yet</h3>
+        <p>Use live labels while trading to teach the monitor what your states look like.</p>
+      </div>
+      ${buildSampleStrip()}
+    `;
+  }
+
+  return `
+    ${buildSampleStrip()}
+    <div class="tilt-event-list">
+      ${rows.map(row => {
+        const label = row.type === 'alert'
+          ? `Alert at risk ${row.item.risk_score}`
+          : getLabelText(row.item.label);
+        const note = row.item.notes || row.item.message || '';
+        return `
+          <div class="tilt-event ${row.type}">
+            <div>
+              <strong>${escapeHtml(label)}</strong>
+              <span>${formatTime(row.time)}</span>
+            </div>
+            <p>${note ? escapeHtml(note) : 'No notes'}</p>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function buildSampleStrip() {
+  const samples = selectedDetails.samples.slice(-60);
+  if (!samples.length) return '';
+
+  return `
+    <div class="tilt-sample-strip" aria-label="Risk samples">
+      ${samples.map(sample => `
+        <span style="height:${Math.max(6, sample.risk_score || 0)}%" title="${formatTime(sample.captured_at)} risk ${sample.risk_score || 0}"></span>
+      `).join('')}
+    </div>
+  `;
+}
+
+function wireTiltMonitor() {
+  document.getElementById('tilt-save-label')?.addEventListener('click', handleSaveLabel);
+  document.getElementById('tilt-mark-calm')?.addEventListener('click', () => quickLabel('calm', 2, 'Marked calm during live session'));
+  document.getElementById('tilt-mark-tilt')?.addEventListener('click', () => quickLabel('tilt', 8, 'Marked tilt during live session'));
+
+  document.querySelectorAll('.tilt-session-item').forEach(btn => {
+    btn.onclick = async () => {
+      selectedSessionId = btn.dataset.id;
+      await loadTiltMonitor();
+    };
+  });
+
+  document.getElementById('tilt-delete-session')?.addEventListener('click', async () => {
+    if (!selectedSessionId || !confirm('Delete this monitor session and all samples, labels, and alerts?')) return;
+    try {
+      await deleteTiltMonitorSession(selectedSessionId);
+      selectedSessionId = null;
+      showToast('Tilt monitor session deleted', 'success');
+      await loadTiltMonitor();
+    } catch (err) {
+      showToast('Failed to delete session: ' + err.message, 'error');
+    }
+  });
+}
+
+async function startMonitoring() {
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+    activeSession = await saveTiltMonitorSession({
+      date: todayString(),
+      started_at: new Date().toISOString(),
+      settings: { sample_ms: SAMPLE_MS, alert_threshold: DEFAULT_THRESHOLD, raw_video_stored: false },
+      notes: '',
+    });
+    selectedSessionId = activeSession.id;
+    baselineSamples = [];
+    baseline = null;
+    previousFrame = null;
+    lastAlertAt = 0;
+
+    updateTopbarSessionButton();
+    await loadTiltMonitor();
+    sampleTimer = setInterval(sampleFrame, SAMPLE_MS);
+    await sampleFrame();
+    showToast('Tilt monitoring started', 'success');
+  } catch (err) {
+    stopMedia();
+    showToast('Camera could not start: ' + err.message, 'error');
+  }
+}
+
+async function stopMonitoring() {
+  if (sampleTimer) clearInterval(sampleTimer);
+  sampleTimer = null;
+
+  try {
+    if (activeSession) {
+      await saveTiltMonitorSession({
+        id: activeSession.id,
+        ended_at: new Date().toISOString(),
+        baseline: baseline || {},
+      });
+    }
+    showToast('Tilt monitoring stopped', 'success');
+  } catch (err) {
+    showToast('Failed to close monitor session: ' + err.message, 'error');
+  } finally {
+    activeSession = null;
+    stopMedia();
+    updateTopbarSessionButton();
+    await loadTiltMonitor();
+  }
+}
+
+async function sampleFrame() {
+  const video = document.getElementById('tilt-video');
+  const canvas = document.getElementById('tilt-canvas');
+  if (!activeSession || !video || !canvas || !video.videoWidth) return;
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const metrics = await analyzeFrame(video, image);
+  const risk = calculateRisk(metrics);
+
+  updateLiveReadout(metrics, risk);
+  selectedDetails.samples.push({ risk_score: risk, captured_at: new Date().toISOString(), ...metrics });
+
+  try {
+    await saveTiltMonitorSample({
+      session_id: activeSession.id,
+      captured_at: new Date().toISOString(),
+      risk_score: risk,
+      face_present: metrics.face_present,
+      face_count: metrics.face_count,
+      motion_score: metrics.motion_score,
+      brightness: metrics.brightness,
+      tension_score: metrics.tension_score,
+      metrics,
+    });
+  } catch (err) {
+    console.warn('Tilt sample save failed:', err);
+  }
+
+  if (risk >= DEFAULT_THRESHOLD && Date.now() - lastAlertAt > ALERT_COOLDOWN_MS) {
+    await triggerTiltAlert(risk);
+  }
+}
+
+async function analyzeFrame(video, image) {
+  let faceCount = 0;
+  if (faceDetector) {
+    try {
+      const faces = await faceDetector.detect(video);
+      faceCount = faces.length;
+    } catch {
+      faceCount = 0;
+    }
+  }
+
+  const data = image.data;
+  let brightness = 0;
+  let motion = 0;
+  const step = 16;
+
+  for (let i = 0; i < data.length; i += step * 4) {
+    const value = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    brightness += value;
+    if (previousFrame) {
+      const prev = (previousFrame[i] + previousFrame[i + 1] + previousFrame[i + 2]) / 3;
+      motion += Math.abs(value - prev);
+    }
+  }
+
+  const count = data.length / (step * 4);
+  brightness = Math.round(brightness / count);
+  motion = Math.round((motion / count) * 2);
+  previousFrame = new Uint8ClampedArray(data);
+
+  const raw = {
+    face_present: faceDetector ? faceCount > 0 : true,
+    face_count: faceDetector ? faceCount : null,
+    motion_score: Math.min(100, motion),
+    brightness,
+  };
+
+  if (baselineSamples.length < 6) {
+    baselineSamples.push(raw);
+    baseline = {
+      motion_score: average(baselineSamples, 'motion_score'),
+      brightness: average(baselineSamples, 'brightness'),
+    };
+  }
+
+  const motionDelta = baseline ? Math.abs(raw.motion_score - baseline.motion_score) : 0;
+  const lightDelta = baseline ? Math.abs(raw.brightness - baseline.brightness) : 0;
+  const tension = Math.min(100, Math.round((motionDelta * 0.9) + (lightDelta * 0.45)));
+
+  return {
+    ...raw,
+    tension_score: tension,
+    baseline_ready: baselineSamples.length >= 6,
+  };
+}
+
+function calculateRisk(metrics) {
+  let risk = 12;
+  risk += metrics.tension_score * 0.65;
+  risk += metrics.motion_score * 0.25;
+  if (metrics.face_present === false) risk += 12;
+  if (!metrics.baseline_ready) risk = Math.min(risk, 35);
+  return Math.max(0, Math.min(100, Math.round(risk)));
+}
+
+async function triggerTiltAlert(risk) {
+  lastAlertAt = Date.now();
+  const message = 'Pattern resembles a high-risk trading state. Pause before the next decision.';
+
+  try {
+    await saveTiltMonitorAlert({
+      session_id: activeSession.id,
+      alerted_at: new Date().toISOString(),
+      risk_score: risk,
+      message,
+      acknowledged: false,
+    });
+  } catch (err) {
+    console.warn('Tilt alert save failed:', err);
+  }
+
+  showToast(message, 'warning');
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Tilt risk rising', { body: message });
+  }
+}
+
+async function handleSaveLabel() {
+  if (!activeSession) return;
+  const label = document.getElementById('tilt-label-type')?.value;
+  const intensity = parseInt(document.getElementById('tilt-label-intensity')?.value || '5', 10);
+  const notes = document.getElementById('tilt-label-notes')?.value.trim() || '';
+  await quickLabel(label, intensity, notes);
+}
+
+async function quickLabel(label, intensity, notes) {
+  if (!activeSession) {
+    showToast('Start monitoring before labeling a moment', 'warning');
+    return;
+  }
+
+  try {
+    await saveTiltMonitorLabel({
+      session_id: activeSession.id,
+      labeled_at: new Date().toISOString(),
+      label,
+      intensity,
+      notes,
+    });
+    showToast('Moment labeled', 'success');
+    document.getElementById('tilt-label-notes').value = '';
+    await loadTiltMonitor();
+  } catch (err) {
+    showToast('Failed to save label: ' + err.message, 'error');
+  }
+}
+
+function attachVideoStream() {
+  const video = document.getElementById('tilt-video');
+  if (video && mediaStream) {
+    video.srcObject = mediaStream;
+  }
+}
+
+function stopMedia() {
+  if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+  mediaStream = null;
+}
+
+function updateLiveReadout(metrics, risk) {
+  const riskFill = document.getElementById('tilt-risk-fill');
+  const riskLabelEl = document.getElementById('tilt-risk-label');
+  const riskNumber = document.getElementById('tilt-risk-number');
+  const faceStatus = document.getElementById('tilt-face-status');
+  const motionScore = document.getElementById('tilt-motion-score');
+  const brightnessScore = document.getElementById('tilt-brightness-score');
+  const tensionScore = document.getElementById('tilt-tension-score');
+
+  if (riskFill) riskFill.style.width = `${risk}%`;
+  if (riskLabelEl) riskLabelEl.textContent = riskLabel(risk);
+  if (riskNumber) riskNumber.textContent = risk;
+  if (faceStatus) faceStatus.textContent = metrics.face_present === false ? 'Lost' : 'Seen';
+  if (motionScore) motionScore.textContent = metrics.motion_score;
+  if (brightnessScore) brightnessScore.textContent = metrics.brightness;
+  if (tensionScore) tensionScore.textContent = metrics.tension_score;
+}
+
+function updateTopbarSessionButton() {
+  const btn = document.getElementById('tilt-session-toggle');
+  if (!btn) return;
+  btn.textContent = activeSession ? 'Stop Monitoring' : 'Start Monitoring';
+  btn.classList.toggle('btn-danger', Boolean(activeSession));
+  btn.classList.toggle('btn-primary', !activeSession);
+}
+
+function setupFaceDetector() {
+  if ('FaceDetector' in window && !faceDetector) {
+    try {
+      faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+    } catch {
+      faceDetector = null;
+    }
+  }
+}
+
+async function requestNotifications() {
+  if (!('Notification' in window)) {
+    showToast('Desktop notifications are not available in this browser', 'warning');
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  showToast(permission === 'granted' ? 'Desktop alerts enabled' : 'Desktop alerts not enabled', permission === 'granted' ? 'success' : 'warning');
+}
+
+function getSelectedSession() {
+  return sessions.find(session => session.id === selectedSessionId) || null;
+}
+
+function getLatestRisk() {
+  const sample = selectedDetails.samples[selectedDetails.samples.length - 1];
+  return sample?.risk_score || 0;
+}
+
+function averageRisk(samples) {
+  if (!samples.length) return 0;
+  return Math.round(samples.reduce((sum, sample) => sum + (sample.risk_score || 0), 0) / samples.length);
+}
+
+function average(list, key) {
+  if (!list.length) return 0;
+  return Math.round(list.reduce((sum, item) => sum + (item[key] || 0), 0) / list.length);
+}
+
+function riskLabel(risk) {
+  if (risk >= DEFAULT_THRESHOLD) return 'Pause zone';
+  if (risk >= 45) return 'Watch zone';
+  return 'Normal range';
+}
+
+function getLabelText(value) {
+  return LABELS.find(item => item.value === value)?.label || value || 'Label';
+}
+
+function formatSessionTitle(session) {
+  return `${formatDate(session.date)} ${formatTime(session.started_at)}`;
+}
+
+function sessionSummary(session) {
+  const start = formatTime(session.started_at);
+  const end = session.ended_at ? formatTime(session.ended_at) : 'active';
+  return `${start} to ${end}`;
+}
+
+function formatTime(value) {
+  if (!value) return '--';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '--';
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
