@@ -260,6 +260,17 @@ function buildAlertSettings() {
       <label class="form-label">Chat ID</label>
       <input type="text" id="tilt-telegram-chat-id" class="form-input" placeholder="123456789" value="${escapeHtml(chatId)}">
     </div>
+    <button class="btn btn-ghost btn-block mt-16" id="tilt-chat-id-help-btn">How to get Chat ID</button>
+    <div class="tilt-help-panel mt-16" id="tilt-chat-id-help" hidden>
+      <ol>
+        <li>Open your Telegram bot chat and press Start.</li>
+        <li>Send the bot any message, such as test.</li>
+        <li>Open https://api.telegram.org/botYOUR_TOKEN/getUpdates in your browser.</li>
+        <li>Find chat then id in the JSON response.</li>
+        <li>Paste that number into Chat ID here.</li>
+      </ol>
+      <p>Keep the bot token private. If it is exposed, revoke it in BotFather and paste the new token here.</p>
+    </div>
     <div class="tilt-live-actions mt-16">
       <button class="btn btn-ghost" id="tilt-save-alert-settings">Save Alerts</button>
       <button class="btn btn-ghost" id="tilt-test-alerts">Test Alert</button>
@@ -398,6 +409,7 @@ function wireTiltMonitor() {
   document.getElementById('tilt-save-alert-settings')?.addEventListener('click', saveAlertSettings);
   document.getElementById('tilt-test-alerts')?.addEventListener('click', testAlertChannels);
   document.getElementById('tilt-simulate-alert')?.addEventListener('click', simulateLiveAlert);
+  document.getElementById('tilt-chat-id-help-btn')?.addEventListener('click', toggleChatIdHelp);
   document.querySelectorAll('.tilt-alert-feedback-btn').forEach(btn => {
     btn.onclick = () => handleAlertFeedback(btn.dataset.label, parseInt(btn.dataset.intensity || '5', 10));
   });
@@ -420,6 +432,12 @@ function wireTiltMonitor() {
       showToast('Failed to delete session: ' + err.message, 'error');
     }
   });
+}
+
+function toggleChatIdHelp() {
+  const panel = document.getElementById('tilt-chat-id-help');
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
 }
 
 async function startMonitoring() {

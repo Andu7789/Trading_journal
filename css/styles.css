@@ -1472,6 +1472,30 @@ tbody td {
   gap: 8px;
 }
 
+.tilt-help-panel {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.tilt-help-panel ol {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.tilt-help-panel li {
+  margin-bottom: 6px;
+}
+
+.tilt-help-panel p {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+}
+
 .tilt-session-list {
   display: flex;
   flex-direction: column;
