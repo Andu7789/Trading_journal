@@ -24,11 +24,14 @@ let baselineSamples = [];
 let baseline = null;
 let lastAlertAt = 0;
 let faceDetector = null;
+let currentAlert = null;
 
 const SAMPLE_MS = 5000;
-const ALERT_COOLDOWN_MS = 60000;
 const DEFAULT_THRESHOLD = 70;
+const DEFAULT_COOLDOWN_SECONDS = 60;
 const ALERT_SOUND_KEY = 'tj_tilt_alert_sound';
+const ALERT_THRESHOLD_KEY = 'tj_tilt_alert_threshold';
+const ALERT_COOLDOWN_KEY = 'tj_tilt_alert_cooldown_seconds';
 const TELEGRAM_ENABLED_KEY = 'tj_tilt_telegram_enabled';
 const TELEGRAM_TOKEN_KEY = 'tj_tilt_telegram_token';
 const TELEGRAM_CHAT_ID_KEY = 'tj_tilt_telegram_chat_id';
@@ -102,6 +105,7 @@ async function loadTiltMonitor() {
 function buildTiltMonitor() {
   const session = getSelectedSession();
   const activeRisk = getLatestRisk();
+  const alertThreshold = getAlertThreshold();
   const totalLabels = selectedDetails.labels.length;
   const totalAlerts = selectedDetails.alerts.length;
   const avgRisk = averageRisk(selectedDetails.samples);
@@ -110,10 +114,10 @@ function buildTiltMonitor() {
     <div class="tilt-monitor-layout">
       <div class="tilt-monitor-main">
         <div class="stats-grid emotion-map-stats">
-          <div class="stat-card ${activeRisk >= DEFAULT_THRESHOLD ? 'loss' : 'primary'}">
+          <div class="stat-card ${activeRisk >= alertThreshold ? 'loss' : 'primary'}">
             <div class="stat-label">Live Risk</div>
-            <div class="stat-value ${activeRisk >= DEFAULT_THRESHOLD ? 'text-loss' : 'text-primary'}">${activeRisk}</div>
-            <div class="stat-sub">${activeSession ? 'Monitoring now' : 'Start a session to sample'}</div>
+            <div class="stat-value ${activeRisk >= alertThreshold ? 'text-loss' : 'text-primary'}">${activeRisk}</div>
+            <div class="stat-sub">${activeSession ? `Alert threshold ${alertThreshold}` : 'Start a session to sample'}</div>
           </div>
           <div class="stat-card warning">
             <div class="stat-label">Session Avg</div>
@@ -153,6 +157,9 @@ function buildTiltMonitor() {
               <div class="tilt-live-readout">
                 <span id="tilt-risk-label">${riskLabel(activeRisk)}</span>
                 <strong id="tilt-risk-number">${activeRisk}</strong>
+              </div>
+              <div id="tilt-alert-feedback-slot">
+                ${buildAlertFeedback()}
               </div>
               <div class="tilt-signal-grid">
                 <div><span>Face</span><strong id="tilt-face-status">--</strong></div>
@@ -216,6 +223,8 @@ function buildTiltMonitor() {
 
 function buildAlertSettings() {
   const soundEnabled = localStorage.getItem(ALERT_SOUND_KEY) !== 'off';
+  const threshold = getAlertThreshold();
+  const cooldownSeconds = getAlertCooldownSeconds();
   const telegramEnabled = localStorage.getItem(TELEGRAM_ENABLED_KEY) === 'on';
   const token = localStorage.getItem(TELEGRAM_TOKEN_KEY) || '';
   const chatId = localStorage.getItem(TELEGRAM_CHAT_ID_KEY) || '';
@@ -229,6 +238,19 @@ function buildAlertSettings() {
       <input type="checkbox" id="tilt-telegram-enabled" ${telegramEnabled ? 'checked' : ''}>
       <span>Send Telegram message</span>
     </label>
+    <div class="form-grid-2 mb-16">
+      <div class="form-group">
+        <label class="form-label">Sensitivity</label>
+        <input type="number" id="tilt-alert-threshold" class="form-input" min="40" max="95" step="5" value="${threshold}">
+        <span class="form-hint">Lower number = earlier alerts.</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cooldown</label>
+        <select id="tilt-alert-cooldown" class="form-select">
+          ${[30, 60, 120, 300].map(value => `<option value="${value}" ${cooldownSeconds === value ? 'selected' : ''}>${formatCooldown(value)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
     <div class="form-group mb-16">
       <label class="form-label">Bot token</label>
       <input type="password" id="tilt-telegram-token" class="form-input" placeholder="123456:ABC..." value="${escapeHtml(token)}">
@@ -241,6 +263,26 @@ function buildAlertSettings() {
     <div class="tilt-live-actions mt-16">
       <button class="btn btn-ghost" id="tilt-save-alert-settings">Save Alerts</button>
       <button class="btn btn-ghost" id="tilt-test-alerts">Test Alert</button>
+    </div>
+  `;
+}
+
+function buildAlertFeedback() {
+  if (!currentAlert) return '';
+
+  return `
+    <div class="tilt-alert-feedback">
+      <div>
+        <strong>High-risk alert fired</strong>
+        <span>${escapeHtml(currentAlert.reason)} · risk ${currentAlert.risk}</span>
+      </div>
+      <div class="tilt-feedback-actions">
+        <button class="btn btn-ghost btn-xs tilt-alert-feedback-btn" data-label="tilt" data-intensity="8">Real Tilt</button>
+        <button class="btn btn-ghost btn-xs tilt-alert-feedback-btn" data-label="fomo" data-intensity="7">FOMO</button>
+        <button class="btn btn-ghost btn-xs tilt-alert-feedback-btn" data-label="revenge" data-intensity="8">Revenge</button>
+        <button class="btn btn-ghost btn-xs tilt-alert-feedback-btn" data-label="false_positive" data-intensity="2">False Positive</button>
+        <button class="btn btn-ghost btn-xs tilt-alert-feedback-btn" data-label="calm" data-intensity="2">I Was Fine</button>
+      </div>
     </div>
   `;
 }
@@ -354,6 +396,9 @@ function wireTiltMonitor() {
   document.getElementById('tilt-mark-tilt')?.addEventListener('click', () => quickLabel('tilt', 8, 'Marked tilt during live session'));
   document.getElementById('tilt-save-alert-settings')?.addEventListener('click', saveAlertSettings);
   document.getElementById('tilt-test-alerts')?.addEventListener('click', testAlertChannels);
+  document.querySelectorAll('.tilt-alert-feedback-btn').forEach(btn => {
+    btn.onclick = () => handleAlertFeedback(btn.dataset.label, parseInt(btn.dataset.intensity || '5', 10));
+  });
 
   document.querySelectorAll('.tilt-session-item').forEach(btn => {
     btn.onclick = async () => {
@@ -381,13 +426,14 @@ async function startMonitoring() {
     activeSession = await saveTiltMonitorSession({
       date: todayString(),
       started_at: new Date().toISOString(),
-      settings: { sample_ms: SAMPLE_MS, alert_threshold: DEFAULT_THRESHOLD, raw_video_stored: false },
+      settings: { sample_ms: SAMPLE_MS, alert_threshold: getAlertThreshold(), alert_cooldown_seconds: getAlertCooldownSeconds(), raw_video_stored: false },
       notes: '',
     });
     selectedSessionId = activeSession.id;
     baselineSamples = [];
     baseline = null;
     previousFrame = null;
+    currentAlert = null;
     lastAlertAt = 0;
 
     updateTopbarSessionButton();
@@ -418,6 +464,7 @@ async function stopMonitoring() {
     showToast('Failed to close monitor session: ' + err.message, 'error');
   } finally {
     activeSession = null;
+    currentAlert = null;
     stopMedia();
     updateTopbarSessionButton();
     await loadTiltMonitor();
@@ -454,8 +501,8 @@ async function sampleFrame() {
     console.warn('Tilt sample save failed:', err);
   }
 
-  if (risk >= DEFAULT_THRESHOLD && Date.now() - lastAlertAt > ALERT_COOLDOWN_MS) {
-    await triggerTiltAlert(risk);
+  if (risk >= getAlertThreshold() && Date.now() - lastAlertAt > getAlertCooldownSeconds() * 1000) {
+    await triggerTiltAlert(risk, metrics);
   }
 }
 
@@ -524,16 +571,22 @@ function calculateRisk(metrics) {
   return Math.max(0, Math.min(100, Math.round(risk)));
 }
 
-async function triggerTiltAlert(risk) {
+async function triggerTiltAlert(risk, metrics = {}) {
   lastAlertAt = Date.now();
   const message = 'Pattern resembles a high-risk trading state. Pause before the next decision.';
+  const reason = describeRiskReason(metrics);
+  currentAlert = {
+    risk,
+    reason,
+    createdAt: new Date().toISOString(),
+  };
 
   try {
     await saveTiltMonitorAlert({
       session_id: activeSession.id,
       alerted_at: new Date().toISOString(),
       risk_score: risk,
-      message,
+      message: `${message} ${reason}`,
       acknowledged: false,
     });
   } catch (err) {
@@ -541,8 +594,9 @@ async function triggerTiltAlert(risk) {
   }
 
   showToast(message, 'warning');
+  renderAlertFeedbackSlot();
   playAlertSound();
-  sendTelegramAlert(risk, message).then(result => {
+  sendTelegramAlert(risk, message, reason).then(result => {
     if (!result.ok) console.warn('Telegram alert not sent:', result.reason);
   });
 
@@ -554,10 +608,14 @@ async function triggerTiltAlert(risk) {
 function saveAlertSettings() {
   const soundEnabled = document.getElementById('tilt-alert-sound')?.checked;
   const telegramEnabled = document.getElementById('tilt-telegram-enabled')?.checked;
+  const threshold = clamp(parseInt(document.getElementById('tilt-alert-threshold')?.value || DEFAULT_THRESHOLD, 10), 40, 95);
+  const cooldownSeconds = parseInt(document.getElementById('tilt-alert-cooldown')?.value || DEFAULT_COOLDOWN_SECONDS, 10);
   const token = document.getElementById('tilt-telegram-token')?.value.trim() || '';
   const chatId = document.getElementById('tilt-telegram-chat-id')?.value.trim() || '';
 
   localStorage.setItem(ALERT_SOUND_KEY, soundEnabled ? 'on' : 'off');
+  localStorage.setItem(ALERT_THRESHOLD_KEY, String(threshold));
+  localStorage.setItem(ALERT_COOLDOWN_KEY, String(cooldownSeconds));
   localStorage.setItem(TELEGRAM_ENABLED_KEY, telegramEnabled ? 'on' : 'off');
   if (token) localStorage.setItem(TELEGRAM_TOKEN_KEY, token);
   else localStorage.removeItem(TELEGRAM_TOKEN_KEY);
@@ -570,7 +628,7 @@ function saveAlertSettings() {
 async function testAlertChannels() {
   saveAlertSettings();
   playAlertSound();
-  const result = await sendTelegramAlert(88, 'Test alert from Tilt Monitor.');
+  const result = await sendTelegramAlert(88, 'Test alert from Tilt Monitor.', 'Manual test from Alert Channels.');
   showToast(result.ok ? 'Test alert sent to Telegram' : `Sound tested. Telegram not sent: ${result.reason}`, result.ok ? 'success' : 'warning');
 }
 
@@ -603,7 +661,7 @@ function playAlertSound() {
   }
 }
 
-async function sendTelegramAlert(risk, message) {
+async function sendTelegramAlert(risk, message, reason = '') {
   if (localStorage.getItem(TELEGRAM_ENABLED_KEY) !== 'on') {
     return { ok: false, reason: 'Telegram is switched off' };
   }
@@ -616,9 +674,11 @@ async function sendTelegramAlert(risk, message) {
   const text = [
     'Tilt Monitor alert',
     `Risk score: ${risk}`,
+    reason ? `Trigger: ${reason}` : '',
     message,
+    'Action: pause before the next trade and label this alert in the journal.',
     `Time: ${new Date().toLocaleString('en-GB')}`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   try {
     const body = new URLSearchParams();
@@ -661,6 +721,14 @@ async function handleSaveLabel() {
   await quickLabel(label, intensity, notes);
 }
 
+async function handleAlertFeedback(label, intensity) {
+  if (!currentAlert) return;
+  const text = `Alert feedback: ${currentAlert.reason}; risk ${currentAlert.risk}`;
+  await quickLabel(label, intensity, text);
+  currentAlert = null;
+  renderAlertFeedbackSlot();
+}
+
 async function quickLabel(label, intensity, notes) {
   if (!activeSession) {
     showToast('Start monitoring before labeling a moment', 'warning');
@@ -681,6 +749,15 @@ async function quickLabel(label, intensity, notes) {
   } catch (err) {
     showToast('Failed to save label: ' + err.message, 'error');
   }
+}
+
+function renderAlertFeedbackSlot() {
+  const slot = document.getElementById('tilt-alert-feedback-slot');
+  if (!slot) return;
+  slot.innerHTML = buildAlertFeedback();
+  slot.querySelectorAll('.tilt-alert-feedback-btn').forEach(btn => {
+    btn.onclick = () => handleAlertFeedback(btn.dataset.label, parseInt(btn.dataset.intensity || '5', 10));
+  });
 }
 
 function attachVideoStream() {
@@ -760,9 +837,39 @@ function average(list, key) {
 }
 
 function riskLabel(risk) {
-  if (risk >= DEFAULT_THRESHOLD) return 'Pause zone';
-  if (risk >= 45) return 'Watch zone';
+  const threshold = getAlertThreshold();
+  if (risk >= threshold) return 'Pause zone';
+  if (risk >= Math.max(35, threshold - 25)) return 'Watch zone';
   return 'Normal range';
+}
+
+function getAlertThreshold() {
+  return clamp(parseInt(localStorage.getItem(ALERT_THRESHOLD_KEY) || DEFAULT_THRESHOLD, 10), 40, 95);
+}
+
+function getAlertCooldownSeconds() {
+  const saved = parseInt(localStorage.getItem(ALERT_COOLDOWN_KEY) || DEFAULT_COOLDOWN_SECONDS, 10);
+  return [30, 60, 120, 300].includes(saved) ? saved : DEFAULT_COOLDOWN_SECONDS;
+}
+
+function formatCooldown(seconds) {
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.round(seconds / 60)} min`;
+}
+
+function clamp(value, min, max) {
+  if (isNaN(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function describeRiskReason(metrics) {
+  const parts = [];
+  if (metrics.tension_score >= 55) parts.push('tension above baseline');
+  if (metrics.motion_score >= 45) parts.push('movement changed sharply');
+  if (metrics.face_present === false) parts.push('face not visible');
+  if (metrics.brightness <= 45 || metrics.brightness >= 210) parts.push('lighting shifted');
+  if (!parts.length) parts.push('risk score crossed threshold');
+  return parts.join(', ');
 }
 
 function getLabelText(value) {
