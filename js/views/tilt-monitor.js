@@ -542,7 +542,9 @@ async function triggerTiltAlert(risk) {
 
   showToast(message, 'warning');
   playAlertSound();
-  sendTelegramAlert(risk, message);
+  sendTelegramAlert(risk, message).then(result => {
+    if (!result.ok) console.warn('Telegram alert not sent:', result.reason);
+  });
 
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('Tilt risk rising', { body: message });
@@ -568,8 +570,8 @@ function saveAlertSettings() {
 async function testAlertChannels() {
   saveAlertSettings();
   playAlertSound();
-  const ok = await sendTelegramAlert(88, 'Test alert from Tilt Monitor.');
-  showToast(ok ? 'Test alert sent' : 'Sound tested. Telegram not sent; check token/chat ID.', ok ? 'success' : 'warning');
+  const result = await sendTelegramAlert(88, 'Test alert from Tilt Monitor.');
+  showToast(result.ok ? 'Test alert sent to Telegram' : `Sound tested. Telegram not sent: ${result.reason}`, result.ok ? 'success' : 'warning');
 }
 
 function playAlertSound() {
@@ -602,11 +604,14 @@ function playAlertSound() {
 }
 
 async function sendTelegramAlert(risk, message) {
-  if (localStorage.getItem(TELEGRAM_ENABLED_KEY) !== 'on') return false;
+  if (localStorage.getItem(TELEGRAM_ENABLED_KEY) !== 'on') {
+    return { ok: false, reason: 'Telegram is switched off' };
+  }
 
   const token = localStorage.getItem(TELEGRAM_TOKEN_KEY);
   const chatId = localStorage.getItem(TELEGRAM_CHAT_ID_KEY);
-  if (!token || !chatId) return false;
+  if (!token) return { ok: false, reason: 'missing bot token' };
+  if (!chatId) return { ok: false, reason: 'missing chat ID' };
 
   const text = [
     'Tilt Monitor alert',
@@ -616,24 +621,35 @@ async function sendTelegramAlert(risk, message) {
   ].join('\n');
 
   try {
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const body = new URLSearchParams();
+    body.set('chat_id', chatId);
+    body.set('text', text);
+    body.set('disable_notification', 'false');
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        disable_notification: false,
-      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body,
     });
 
     if (!res.ok) {
-      console.warn('Telegram alert failed:', await res.text());
-      return false;
+      const detail = await res.text();
+      console.warn('Telegram alert failed:', detail);
+      return { ok: false, reason: parseTelegramError(detail, res.status) };
     }
-    return true;
+    return { ok: true };
   } catch (err) {
     console.warn('Telegram alert failed:', err);
-    return false;
+    return { ok: false, reason: err.message || 'network/browser request failed' };
+  }
+}
+
+function parseTelegramError(detail, status) {
+  try {
+    const parsed = JSON.parse(detail);
+    return parsed.description || `Telegram HTTP ${status}`;
+  } catch {
+    return detail || `Telegram HTTP ${status}`;
   }
 }
 
