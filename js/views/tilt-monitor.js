@@ -241,7 +241,7 @@ function buildAlertSettings() {
     <div class="form-grid-2 mb-16">
       <div class="form-group">
         <label class="form-label">Sensitivity</label>
-        <input type="number" id="tilt-alert-threshold" class="form-input" min="40" max="95" step="5" value="${threshold}">
+        <input type="number" id="tilt-alert-threshold" class="form-input" min="10" max="95" step="5" value="${threshold}">
         <span class="form-hint">Lower number = earlier alerts.</span>
       </div>
       <div class="form-group">
@@ -264,6 +264,7 @@ function buildAlertSettings() {
       <button class="btn btn-ghost" id="tilt-save-alert-settings">Save Alerts</button>
       <button class="btn btn-ghost" id="tilt-test-alerts">Test Alert</button>
     </div>
+    <button class="btn btn-ghost btn-block mt-16" id="tilt-simulate-alert" ${activeSession ? '' : 'disabled'}>Simulate Live Alert</button>
   `;
 }
 
@@ -396,6 +397,7 @@ function wireTiltMonitor() {
   document.getElementById('tilt-mark-tilt')?.addEventListener('click', () => quickLabel('tilt', 8, 'Marked tilt during live session'));
   document.getElementById('tilt-save-alert-settings')?.addEventListener('click', saveAlertSettings);
   document.getElementById('tilt-test-alerts')?.addEventListener('click', testAlertChannels);
+  document.getElementById('tilt-simulate-alert')?.addEventListener('click', simulateLiveAlert);
   document.querySelectorAll('.tilt-alert-feedback-btn').forEach(btn => {
     btn.onclick = () => handleAlertFeedback(btn.dataset.label, parseInt(btn.dataset.intensity || '5', 10));
   });
@@ -608,7 +610,7 @@ async function triggerTiltAlert(risk, metrics = {}) {
 function saveAlertSettings() {
   const soundEnabled = document.getElementById('tilt-alert-sound')?.checked;
   const telegramEnabled = document.getElementById('tilt-telegram-enabled')?.checked;
-  const threshold = clamp(parseInt(document.getElementById('tilt-alert-threshold')?.value || DEFAULT_THRESHOLD, 10), 40, 95);
+  const threshold = clamp(parseInt(document.getElementById('tilt-alert-threshold')?.value || DEFAULT_THRESHOLD, 10), 10, 95);
   const cooldownSeconds = parseInt(document.getElementById('tilt-alert-cooldown')?.value || DEFAULT_COOLDOWN_SECONDS, 10);
   const token = document.getElementById('tilt-telegram-token')?.value.trim() || '';
   const chatId = document.getElementById('tilt-telegram-chat-id')?.value.trim() || '';
@@ -630,6 +632,21 @@ async function testAlertChannels() {
   playAlertSound();
   const result = await sendTelegramAlert(88, 'Test alert from Tilt Monitor.', 'Manual test from Alert Channels.');
   showToast(result.ok ? 'Test alert sent to Telegram' : `Sound tested. Telegram not sent: ${result.reason}`, result.ok ? 'success' : 'warning');
+}
+
+async function simulateLiveAlert() {
+  if (!activeSession) {
+    showToast('Start monitoring before simulating a live alert', 'warning');
+    return;
+  }
+
+  saveAlertSettings();
+  await triggerTiltAlert(Math.max(getAlertThreshold(), 88), {
+    tension_score: 75,
+    motion_score: 55,
+    brightness: 120,
+    face_present: true,
+  });
 }
 
 function playAlertSound() {
@@ -844,7 +861,7 @@ function riskLabel(risk) {
 }
 
 function getAlertThreshold() {
-  return clamp(parseInt(localStorage.getItem(ALERT_THRESHOLD_KEY) || DEFAULT_THRESHOLD, 10), 40, 95);
+  return clamp(parseInt(localStorage.getItem(ALERT_THRESHOLD_KEY) || DEFAULT_THRESHOLD, 10), 10, 95);
 }
 
 function getAlertCooldownSeconds() {
