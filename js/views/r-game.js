@@ -70,16 +70,17 @@ async function ensureSettings(today) {
 function buildRGame(today, startDate, entries) {
   const periods = getPeriods(today, startDate);
   const lifetime = calcSummary(entries);
+  const records = getPeriodRecords(entries);
 
   return `
     <div class="r-game-layout">
       <div class="r-game-main">
         <div class="stats-grid r-game-stats">
-          ${buildStatCard('Today', entriesForPeriod(entries, periods.day), 'Current session')}
-          ${buildStatCard('Week', entriesForPeriod(entries, periods.week), `${formatDate(periods.week.start)} - ${formatDate(periods.week.end)}`)}
-          ${buildStatCard('Month', entriesForPeriod(entries, periods.month), formatMonthLabel(today))}
-          ${buildStatCard('Quarter', entriesForPeriod(entries, periods.quarter), formatQuarterLabel(today))}
-          ${buildStatCard('Year', entriesForPeriod(entries, periods.year), String(new Date(today + 'T00:00:00').getFullYear()))}
+          ${buildStatCard('Today', entriesForPeriod(entries, periods.day), 'Current session', records.day)}
+          ${buildStatCard('Week', entriesForPeriod(entries, periods.week), `${formatDate(periods.week.start)} - ${formatDate(periods.week.end)}`, records.week)}
+          ${buildStatCard('Month', entriesForPeriod(entries, periods.month), formatMonthLabel(today), records.month)}
+          ${buildStatCard('Quarter', entriesForPeriod(entries, periods.quarter), formatQuarterLabel(today), records.quarter)}
+          ${buildStatCard('Year', entriesForPeriod(entries, periods.year), String(new Date(today + 'T00:00:00').getFullYear()), records.year)}
         </div>
 
         <div class="card">
@@ -154,14 +155,14 @@ function buildRGame(today, startDate, entries) {
   `;
 }
 
-function buildStatCard(label, entries, subtitle) {
+function buildStatCard(label, entries, subtitle, record) {
   const summary = calcSummary(entries);
   const cls = scoreClass(summary.total);
   return `
     <div class="stat-card ${summary.total > 0 ? 'profit' : summary.total < 0 ? 'loss' : 'secondary'}">
       <div class="stat-label">${label}</div>
       <div class="stat-value ${cls}">${formatR(summary.total)}</div>
-      <div class="r-game-record">Record: ${summary.wins}W - ${summary.losses}L - ${summary.breakevens}BE</div>
+      <div class="r-game-record">Record: ${formatR(record)}</div>
       <div class="stat-sub">${subtitle}</div>
     </div>
   `;
@@ -295,6 +296,32 @@ function clampPeriod(start, end, floor) {
 
 function entriesForPeriod(entries, period) {
   return entries.filter(entry => entry.date >= period.start && entry.date <= period.end);
+}
+
+function getPeriodRecords(entries) {
+  return {
+    day: bestGroupedTotal(entries, entry => entry.date),
+    week: bestGroupedTotal(entries, entry => getWeekRange(entry.date).start),
+    month: bestGroupedTotal(entries, entry => entry.date.slice(0, 7)),
+    quarter: bestGroupedTotal(entries, entry => {
+      const [year, month] = entry.date.split('-').map(Number);
+      return `${year}-Q${Math.floor((month - 1) / 3) + 1}`;
+    }),
+    year: bestGroupedTotal(entries, entry => entry.date.slice(0, 4)),
+  };
+}
+
+function bestGroupedTotal(entries, getGroupKey) {
+  if (!entries.length) return 0;
+
+  const totals = new Map();
+  entries.forEach(entry => {
+    const key = getGroupKey(entry);
+    const amount = parseFloat(entry.amount) || 0;
+    totals.set(key, (totals.get(key) || 0) + amount);
+  });
+
+  return parseFloat(Math.max(...totals.values()).toFixed(2));
 }
 
 function calcSummary(entries) {
