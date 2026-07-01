@@ -299,7 +299,7 @@ function buildTradeRow(t) {
     </tr>
     ${hasDetails ? `
     <tr id="detail-${t.id}" class="hidden">
-      <td colspan="13" style="background:var(--bg-surface);padding:16px 20px">
+      <td colspan="13" class="trade-detail-cell">
         ${signals.length ? `
           <div style="margin-bottom:12px">
             <div class="text-xs text-muted mb-8">Signal Confluence (${signals.length}/4)</div>
@@ -313,21 +313,21 @@ function buildTradeRow(t) {
                 </span>`).join('')}
             </div>
           </div>` : ''}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="trade-detail-grid">
           ${t.trade_type === 'missed' && t.missed_reason ? `
-            <div>
+            <div class="trade-detail-field">
               <div class="text-xs text-muted mb-8">Why Not Taken</div>
-              <div class="text-sm" style="color:var(--warning)">${t.missed_reason.replace(/_/g,' ')}</div>
+              <div class="text-sm trade-detail-text" style="color:var(--warning)">${t.missed_reason.replace(/_/g,' ')}</div>
             </div>` : ''}
           ${t.notes ? `
-            <div>
+            <div class="trade-detail-field">
               <div class="text-xs text-muted mb-8">Trade Notes</div>
-              <div class="text-sm" style="line-height:1.6;color:var(--text-secondary)">${nl2br(t.notes)}</div>
+              <div class="text-sm trade-detail-text" style="color:var(--text-secondary)">${nl2br(t.notes)}</div>
             </div>` : ''}
           ${t.mistakes ? `
-            <div>
+            <div class="trade-detail-field">
               <div class="text-xs text-muted mb-8">Mistakes / Deviations</div>
-              <div class="text-sm" style="line-height:1.6;color:var(--loss)">${nl2br(t.mistakes)}</div>
+              <div class="text-sm trade-detail-text" style="color:var(--loss)">${nl2br(t.mistakes)}</div>
             </div>` : ''}
         </div>
         ${t.tags?.length ? `

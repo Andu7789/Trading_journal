@@ -934,6 +934,29 @@ tbody td {
 
 .td-mono { font-family: var(--font-mono); font-size: 12px; }
 
+.trade-detail-cell {
+  background: var(--bg-surface);
+  padding: 16px 20px;
+  white-space: normal;
+}
+
+.trade-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.trade-detail-field {
+  min-width: 0;
+}
+
+.trade-detail-text {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
 /* =============================================
    BADGES / TAGS
    ============================================= */
