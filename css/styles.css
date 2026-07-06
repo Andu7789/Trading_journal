@@ -810,6 +810,34 @@ select.form-input option {
 
 .plan-image-remove:hover { background: var(--loss); }
 
+/* Session log images — equal-width, fill the row, shrink as more are added */
+.log-images-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.log-image-item {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.log-image-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+  display: block;
+  transition: opacity var(--transition);
+}
+
+.log-image-item img:hover { opacity: 0.85; }
+
+.log-image-item.placeholder {
+  border: 2px dashed var(--border-light);
+}
+
 /* Session log (running intraday notes + screenshots) */
 .session-log-rows {
   display: flex;

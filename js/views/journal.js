@@ -385,6 +385,14 @@ function buildPlanImages() {
   return `<div class="plan-images-grid">${slots}</div>`;
 }
 
+function logGridColumns(count) {
+  return Math.max(count, 3);
+}
+
+function logGridPlaceholders(count) {
+  return '<div class="log-image-item placeholder"></div>'.repeat(Math.max(0, 3 - count));
+}
+
 function buildSessionLogList() {
   if (!currentSessionLog.length) {
     return '<div class="empty-state" style="padding:16px 0"><p class="text-muted text-sm">No entries yet — add one below as your day unfolds.</p></div>';
@@ -399,8 +407,13 @@ function buildSessionLogList() {
           </div>
           ${entry.comment ? `<div class="session-log-comment">${nl2br(entry.comment)}</div>` : ''}
           ${entry.images.length ? `
-          <div class="screenshots-grid">
-            ${entry.images.map((url, imgIdx) => `<img src="${url}" class="screenshot-thumb" onclick="window._journalViewLogImage(${idx}, ${imgIdx})" alt="log screenshot">`).join('')}
+          <div class="log-images-grid" style="grid-template-columns:repeat(${logGridColumns(entry.images.length)}, 1fr)">
+            ${entry.images.map((url, imgIdx) => `
+              <div class="log-image-item">
+                <img src="${url}" onclick="window._journalViewLogImage(${idx}, ${imgIdx})" alt="log screenshot">
+              </div>
+            `).join('')}
+            ${logGridPlaceholders(entry.images.length)}
           </div>` : ''}
         </div>
       `).join('')}
@@ -411,13 +424,14 @@ function buildSessionLogList() {
 function buildLogPendingImages() {
   if (!pendingLogImages.length) return '';
   return `
-    <div class="screenshot-previews" style="padding:8px 0 0">
+    <div class="log-images-grid" style="grid-template-columns:repeat(${logGridColumns(pendingLogImages.length)}, 1fr);margin-top:8px">
       ${pendingLogImages.map((item, idx) => `
-        <div class="preview-item">
+        <div class="log-image-item">
           <img src="${item.localUrl}" alt="pending">
-          <button type="button" class="preview-remove" onclick="window._journalRemoveLogPendingImage(${idx})">&times;</button>
+          <button type="button" class="plan-image-remove" onclick="window._journalRemoveLogPendingImage(${idx})">&times;</button>
         </div>
       `).join('')}
+      ${logGridPlaceholders(pendingLogImages.length)}
     </div>
   `;
 }
@@ -787,6 +801,8 @@ function initJournalInteractions(date) {
       });
       pendingLogImages = [];
       textarea.value = '';
+      const pendingContainer = document.getElementById('log-pending-images');
+      if (pendingContainer) pendingContainer.innerHTML = buildLogPendingImages();
       renderSessionLog(date);
       await saveJournal(date, false);
       showToast('Entry added', 'success');
