@@ -17,6 +17,10 @@ let currentPlanImages = [null, null, null];
 let currentSessionLog = [];
 let pendingLogImages = [];
 
+// Local screen-capture helper (see tools/screen_capture_helper.py) — runs on
+// the trading PC and grabs all monitors without browser permission dialogs.
+const CAPTURE_HELPER_URL = 'http://127.0.0.1:8933';
+
 const DEFAULT_SINS = [
   'Exited too soon',
   'Exited too late',
@@ -215,8 +219,11 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
           <div class="session-log-add">
             <textarea id="new-log-comment" class="form-textarea" rows="2" placeholder="What's happening right now? Add a quick note..."></textarea>
             <div class="session-log-add-zone">
-              <input type="file" accept="image/*" multiple id="log-image-input" style="display:none" onchange="window._journalLogImageChange(this)">
-              <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('log-image-input').click()">📎 Attach Images</button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input type="file" accept="image/*" multiple id="log-image-input" style="display:none" onchange="window._journalLogImageChange(this)">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('log-image-input').click()">📎 Attach Images</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="capture-screens-btn">🖥️ Capture All Screens</button>
+              </div>
               <div id="log-pending-images">${buildLogPendingImages()}</div>
             </div>
             <div style="display:flex;justify-content:flex-end">
@@ -778,6 +785,26 @@ function initJournalInteractions(date) {
     if (container) container.innerHTML = buildLogPendingImages();
   };
   wireSessionLogControls(date);
+  document.getElementById('capture-screens-btn').onclick = async () => {
+    const btn = document.getElementById('capture-screens-btn');
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = 'Capturing...';
+    try {
+      const res = await fetch(`${CAPTURE_HELPER_URL}/capture`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Capture failed');
+      data.urls.forEach(url => pendingLogImages.push({ file: null, localUrl: url, uploaded: true, url }));
+      const container = document.getElementById('log-pending-images');
+      if (container) container.innerHTML = buildLogPendingImages();
+      showToast(`Captured ${data.urls.length} screen${data.urls.length !== 1 ? 's' : ''}`, 'success');
+    } catch (err) {
+      showToast('Capture helper not reachable — is it running on your PC?', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  };
   document.getElementById('add-log-entry-btn').onclick = async () => {
     const textarea = document.getElementById('new-log-comment');
     const comment = textarea?.value.trim() || '';
@@ -791,7 +818,7 @@ function initJournalInteractions(date) {
     try {
       const images = [];
       for (const item of pendingLogImages) {
-        images.push(await uploadScreenshot(item.file));
+        images.push(item.uploaded ? item.url : await uploadScreenshot(item.file));
       }
       currentSessionLog.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
