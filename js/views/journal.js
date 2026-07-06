@@ -1,7 +1,7 @@
 // =============================================
 //  DAILY JOURNAL VIEW
 // =============================================
-import { getJournalEntry, saveJournalEntry, getTrades } from '../db.js';
+import { getJournalEntry, saveJournalEntry, getTrades, uploadScreenshot } from '../db.js';
 import { todayString, formatDate, addDays, calcStats, formatCurrency,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          tiltLabel, tiltClass, nl2br, debounce, getSignalDisplay,
@@ -13,6 +13,9 @@ let currentDate = todayString();
 let saveTimer = null;
 let pendingSave = false;
 let currentSins = [];
+let currentPlanImages = [null, null, null];
+let currentSessionLog = [];
+let pendingLogImages = [];
 
 const DEFAULT_SINS = [
   'Exited too soon',
@@ -109,6 +112,9 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
   const isToday = date === todayString();
   const dayLabel = formatDateLong(date);
   currentSins = normalizeSins(entry.trading_sins);
+  currentPlanImages = normalizePlanImages(entry.plan_images);
+  currentSessionLog = normalizeSessionLog(entry.session_log);
+  pendingLogImages = [];
 
   // Auto-fill Economic Events textarea when entry has no saved value
   const autoEconomicEvents = !entry.economic_events && news.length
@@ -184,6 +190,38 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
           <div class="form-group">
             <label class="form-label">Daily Goals &amp; Trading Plan</label>
             <textarea id="j-goals" class="form-textarea" rows="3" placeholder="What do you aim to achieve today? What setups will you look for? What is your max daily loss?">${entry.daily_goals || ''}</textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Trading Plan Screenshots</label>
+            <div class="text-xs text-muted">Add up to 3 images for today's plan — click one to enlarge.</div>
+            <div id="plan-images-container">${buildPlanImages()}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SESSION LOG -->
+      <div class="journal-section" id="section-sessionlog">
+        <div class="journal-section-header" onclick="window._toggleSection('sessionlog')">
+          <div class="section-header-left">
+            <span class="section-icon">🗒️</span>
+            <span class="section-title">Session Log</span>
+            <span class="section-badge" style="${currentSessionLog.length ? '' : 'display:none'}">${currentSessionLog.length}</span>
+          </div>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="journal-section-body">
+          <div class="text-sm text-muted">Add notes and screenshots as the day unfolds — each entry becomes a new row below.</div>
+          <div id="session-log-list">${buildSessionLogList()}</div>
+          <div class="session-log-add">
+            <textarea id="new-log-comment" class="form-textarea" rows="2" placeholder="What's happening right now? Add a quick note..."></textarea>
+            <div class="session-log-add-zone">
+              <input type="file" accept="image/*" multiple id="log-image-input" style="display:none" onchange="window._journalLogImageChange(this)">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('log-image-input').click()">📎 Attach Images</button>
+              <div id="log-pending-images">${buildLogPendingImages()}</div>
+            </div>
+            <div style="display:flex;justify-content:flex-end">
+              <button type="button" class="btn btn-primary btn-sm" id="add-log-entry-btn">+ Add Entry</button>
+            </div>
           </div>
         </div>
       </div>
@@ -305,6 +343,105 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
       <button class="btn btn-primary btn-lg" id="save-journal-btn">Save Journal Entry</button>
     </div>
   `;
+}
+
+function normalizePlanImages(images) {
+  const arr = Array.isArray(images) ? images.filter(u => typeof u === 'string' && u) : [];
+  return [arr[0] || null, arr[1] || null, arr[2] || null];
+}
+
+function normalizeSessionLog(log) {
+  if (!Array.isArray(log)) return [];
+  return log
+    .filter(e => e && typeof e === 'object')
+    .map(e => ({
+      id: e.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      time: e.time || '',
+      comment: e.comment || '',
+      images: Array.isArray(e.images) ? e.images.filter(Boolean) : [],
+    }));
+}
+
+function buildPlanImages() {
+  const slots = [0, 1, 2].map(i => {
+    const url = currentPlanImages[i];
+    const inputId = `plan-image-file-${i}`;
+    const fileInput = `<input type="file" accept="image/*" id="${inputId}" style="display:none" onchange="window._journalPlanImageChange(${i}, this)">`;
+    if (url) {
+      return `
+        <div class="plan-image-slot filled">
+          <img src="${url}" alt="Trading plan ${i + 1}" onclick="window._journalViewPlanImage(${i})">
+          <button type="button" class="plan-image-remove" onclick="window._journalRemovePlanImage(${i})" title="Remove image">&times;</button>
+          ${fileInput}
+        </div>`;
+    }
+    return `
+      <div class="plan-image-slot empty" onclick="document.getElementById('${inputId}').click()">
+        <span class="plan-image-plus">+</span>
+        <span class="plan-image-label">Add Image</span>
+        ${fileInput}
+      </div>`;
+  }).join('');
+  return `<div class="plan-images-grid">${slots}</div>`;
+}
+
+function buildSessionLogList() {
+  if (!currentSessionLog.length) {
+    return '<div class="empty-state" style="padding:16px 0"><p class="text-muted text-sm">No entries yet — add one below as your day unfolds.</p></div>';
+  }
+  return `
+    <div class="session-log-rows">
+      ${currentSessionLog.map((entry, idx) => `
+        <div class="session-log-row">
+          <div class="session-log-row-header">
+            <span class="session-log-time">${escapeHtml(entry.time)}</span>
+            <button type="button" class="btn btn-ghost btn-xs session-log-delete" data-index="${idx}">Delete</button>
+          </div>
+          ${entry.comment ? `<div class="session-log-comment">${nl2br(entry.comment)}</div>` : ''}
+          ${entry.images.length ? `
+          <div class="screenshots-grid">
+            ${entry.images.map((url, imgIdx) => `<img src="${url}" class="screenshot-thumb" onclick="window._journalViewLogImage(${idx}, ${imgIdx})" alt="log screenshot">`).join('')}
+          </div>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function buildLogPendingImages() {
+  if (!pendingLogImages.length) return '';
+  return `
+    <div class="screenshot-previews" style="padding:8px 0 0">
+      ${pendingLogImages.map((item, idx) => `
+        <div class="preview-item">
+          <img src="${item.localUrl}" alt="pending">
+          <button type="button" class="preview-remove" onclick="window._journalRemoveLogPendingImage(${idx})">&times;</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderSessionLog(date) {
+  const list = document.getElementById('session-log-list');
+  if (list) list.innerHTML = buildSessionLogList();
+  const badge = document.querySelector('#section-sessionlog .section-badge');
+  if (badge) {
+    badge.textContent = currentSessionLog.length;
+    badge.style.display = currentSessionLog.length ? '' : 'none';
+  }
+  wireSessionLogControls(date);
+}
+
+function wireSessionLogControls(date) {
+  document.querySelectorAll('.session-log-delete').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.index);
+      currentSessionLog.splice(idx, 1);
+      renderSessionLog(date);
+      triggerAutosave(date);
+    };
+  });
 }
 
 function normalizeSins(sins) {
@@ -580,6 +717,87 @@ function initJournalInteractions(date) {
     if (e.key === 'Enter') addSin();
   };
 
+  // Trading plan images
+  window._journalPlanImageChange = async (idx, input) => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const url = await uploadScreenshot(file);
+      currentPlanImages[idx] = url;
+      document.getElementById('plan-images-container').innerHTML = buildPlanImages();
+      triggerAutosave(date);
+    } catch (err) {
+      showToast('Image upload failed: ' + err.message, 'error');
+    }
+  };
+  window._journalRemovePlanImage = (idx) => {
+    currentPlanImages[idx] = null;
+    document.getElementById('plan-images-container').innerHTML = buildPlanImages();
+    triggerAutosave(date);
+  };
+  window._journalViewPlanImage = (idx) => {
+    const gallery = currentPlanImages.filter(Boolean);
+    window._viewImage(currentPlanImages[idx], gallery);
+  };
+
+  // Session log
+  window._journalViewLogImage = (rowIdx, imgIdx) => {
+    const row = currentSessionLog[rowIdx];
+    if (!row) return;
+    window._viewImage(row.images[imgIdx], row.images);
+  };
+  window._journalLogImageChange = (input) => {
+    Array.from(input.files || []).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        pendingLogImages.push({ file, localUrl: e.target.result });
+        const container = document.getElementById('log-pending-images');
+        if (container) container.innerHTML = buildLogPendingImages();
+      };
+      reader.readAsDataURL(file);
+    });
+    input.value = '';
+  };
+  window._journalRemoveLogPendingImage = (idx) => {
+    pendingLogImages.splice(idx, 1);
+    const container = document.getElementById('log-pending-images');
+    if (container) container.innerHTML = buildLogPendingImages();
+  };
+  wireSessionLogControls(date);
+  document.getElementById('add-log-entry-btn').onclick = async () => {
+    const textarea = document.getElementById('new-log-comment');
+    const comment = textarea?.value.trim() || '';
+    if (!comment && !pendingLogImages.length) {
+      showToast('Add a comment or an image first', 'warning');
+      return;
+    }
+    const btn = document.getElementById('add-log-entry-btn');
+    btn.disabled = true;
+    btn.textContent = 'Adding...';
+    try {
+      const images = [];
+      for (const item of pendingLogImages) {
+        images.push(await uploadScreenshot(item.file));
+      }
+      currentSessionLog.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        comment,
+        images,
+      });
+      pendingLogImages = [];
+      textarea.value = '';
+      renderSessionLog(date);
+      await saveJournal(date, false);
+      showToast('Entry added', 'success');
+    } catch (err) {
+      showToast('Failed to add entry: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '+ Add Entry';
+    }
+  };
+
   // Manual save button
   document.getElementById('save-journal-btn').onclick = () => saveJournal(date, true);
 }
@@ -600,6 +818,8 @@ function getJournalData(date) {
     emotion_rating:    parseInt(getValue('j-emotion')) || 5,
     overall_rating:    parseInt(getValue('j-overall')) || 5,
     trading_sins:      currentSins,
+    plan_images:       currentPlanImages.filter(Boolean),
+    session_log:       currentSessionLog,
   };
 }
 

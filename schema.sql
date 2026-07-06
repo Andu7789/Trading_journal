@@ -75,6 +75,10 @@ CREATE TABLE IF NOT EXISTS public.journal_entries (
   key_levels      TEXT DEFAULT '',
   economic_events TEXT DEFAULT '',
   daily_goals     TEXT DEFAULT '',
+  plan_images     JSONB,
+
+  -- Running log of intraday notes/screenshots
+  session_log     JSONB,
 
   -- Post-session review
   what_went_well  TEXT DEFAULT '',
@@ -308,6 +312,10 @@ ALTER TABLE public.trades
 
 ALTER TABLE public.journal_entries
   ADD COLUMN IF NOT EXISTS trading_sins JSONB;
+
+ALTER TABLE public.journal_entries
+  ADD COLUMN IF NOT EXISTS plan_images JSONB,
+  ADD COLUMN IF NOT EXISTS session_log JSONB;
 
 -- =============================================
 --  STORAGE
