@@ -4,7 +4,7 @@
 import { initSupabase, isConnected, testConnection, saveTrade,
          getTradeById, getDistinctSymbols, uploadScreenshot,
          getAuthSession, signInWithGoogle, signOut } from './db.js';
-import { todayString, tiltLabel, tiltClass, formatCurrency, calcTradeR, formatR } from './utils.js';
+import { todayString, tiltLabel, tiltClass, formatCurrency, calcTradeR, formatR, captureAllScreens } from './utils.js';
 
 // ---- Views ----
 import { renderDashboard } from './views/dashboard.js';
@@ -25,6 +25,9 @@ import { renderTiltMonitor }     from './views/tilt-monitor.js';
 let currentView    = null;
 let tradeCallback  = null;
 let pendingScreenshots = []; // { file, url } for new uploads; or { url } for existing
+
+// "See EURUSD" cross-reference — the correlated pair to fill in as the opposite symbol
+const OPPOSITE_SYMBOL_MAP = { EURUSD: 'GBPUSD', GBPUSD: 'EURUSD' };
 
 function updateTradeSignalScore() {
   const btns  = document.querySelectorAll('#trade-form .signal-toggle[data-signal]');
@@ -437,6 +440,31 @@ function setupTradeModal() {
           const trade = trades.find(t => t.id === item.dataset.id);
           if (!trade) return;
 
+          // Same date & time
+          document.getElementById('trade-date').value = trade.date || '';
+          if (trade.trade_time) {
+            const [hour, minute] = trade.trade_time.split(':');
+            document.getElementById('trade-hour').value   = hour || '';
+            document.getElementById('trade-minute').value = minute || '';
+          }
+
+          // Opposite symbol (EURUSD <-> GBPUSD pairing)
+          const oppositeSymbol = OPPOSITE_SYMBOL_MAP[trade.symbol];
+          if (oppositeSymbol) document.getElementById('trade-symbol').value = oppositeSymbol;
+
+          // Same direction
+          if (trade.direction) {
+            document.getElementById('trade-direction').value = trade.direction;
+            document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.dir-btn[data-dir="${trade.direction}"]`)?.classList.add('active');
+          }
+
+          // Same risk amount
+          if (trade.risk_amount != null) {
+            document.getElementById('trade-risk').value = trade.risk_amount;
+            recalcR();
+          }
+
           // Copy signal confluence
           const signalBtns = document.querySelectorAll('#trade-form .signal-toggle[data-signal]');
           const tradeSignals = Array.isArray(trade.signals) ? trade.signals : [];
@@ -538,6 +566,28 @@ function setupScreenshotZone() {
     zone.classList.remove('dragover');
     addFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
   });
+
+  // Capture all screens
+  const captureBtn = document.getElementById('trade-capture-screens-btn');
+  captureBtn?.addEventListener('click', async () => {
+    const originalText = captureBtn.textContent;
+    captureBtn.disabled = true;
+    captureBtn.textContent = 'Capturing...';
+    try {
+      const urls = await captureAllScreens();
+      if (!urls.length) {
+        showToast('No other screens to capture', 'warning');
+      } else {
+        addCapturedScreenshots(urls);
+        showToast(`Captured ${urls.length} screen${urls.length !== 1 ? 's' : ''}`, 'success');
+      }
+    } catch (err) {
+      showToast('Capture helper not reachable — is it running on your PC?', 'error');
+    } finally {
+      captureBtn.disabled = false;
+      captureBtn.textContent = originalText;
+    }
+  });
 }
 
 function addFiles(files) {
@@ -564,6 +614,26 @@ function addFiles(files) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+function addCapturedScreenshots(urls) {
+  const previews = document.getElementById('screenshot-previews');
+  if (!previews) return;
+
+  urls.forEach(url => {
+    pendingScreenshots.push({ file: null, url, localUrl: url, uploaded: true });
+    const idx = pendingScreenshots.length - 1;
+
+    const item = document.createElement('div');
+    item.className = 'preview-item';
+    item.dataset.idx = idx;
+    item.innerHTML = `
+      <img src="${url}" alt="screenshot" onclick="window._viewPreview(this)">
+      <button class="preview-remove" onclick="removePreview(${idx})">×</button>
+    `;
+    previews.appendChild(item);
+  });
+  updateTradeModalViewAll();
 }
 
 window.removePreview = function(idx) {

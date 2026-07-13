@@ -374,7 +374,10 @@
             <div class="form-section">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                 <h3 class="form-section-title" style="margin-bottom:0">Screenshots</h3>
-                <button type="button" id="trade-modal-view-all" class="btn btn-ghost btn-xs" style="display:none" onclick="window._openTradeModalGallery()">View All</button>
+                <div style="display:flex;gap:8px">
+                  <button type="button" id="trade-capture-screens-btn" class="btn btn-ghost btn-xs">🖥️ Capture All Screens</button>
+                  <button type="button" id="trade-modal-view-all" class="btn btn-ghost btn-xs" style="display:none" onclick="window._openTradeModalGallery()">View All</button>
+                </div>
               </div>
               <div class="screenshot-zone" id="screenshot-zone">
                 <input type="file" id="screenshot-input" multiple accept="image/*" style="display:none">

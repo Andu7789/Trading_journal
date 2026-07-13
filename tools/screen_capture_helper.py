@@ -1,9 +1,11 @@
 """
-Local screen-capture helper for the Trading Journal Session Log.
+Local screen-capture helper for the Trading Journal (Session Log and Add Trade).
 
-Run this on your trading PC. While it's running, the "Capture All Screens"
-button in the Session Log screenshots every connected monitor and uploads
-them straight to Supabase — no browser share-screen dialogs.
+Run this on your trading PC. While it's running, any "Capture All Screens"
+button in the app screenshots every connected monitor and uploads them
+straight to Supabase — no browser share-screen dialogs. The monitor
+currently showing the journal app itself is excluded automatically (the
+browser tells the helper where its window is via x/y query params).
 
 Setup (once):
     pip install -r requirements.txt
@@ -17,6 +19,7 @@ import json
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit, parse_qs
 
 import mss
 import mss.tools
@@ -47,11 +50,21 @@ def upload_screenshot(png_bytes):
     return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET}/{filename}"
 
 
-def capture_all_monitors():
+def _point_in_monitor(point, monitor):
+    x, y = point
+    return (
+        monitor["left"] <= x < monitor["left"] + monitor["width"]
+        and monitor["top"] <= y < monitor["top"] + monitor["height"]
+    )
+
+
+def capture_all_monitors(exclude_point=None):
     urls = []
     with mss.mss() as sct:
         # monitors[0] is the union of every display; grab each one individually instead
         for monitor in sct.monitors[1:]:
+            if exclude_point and _point_in_monitor(exclude_point, monitor):
+                continue
             shot = sct.grab(monitor)
             png_bytes = mss.tools.to_png(shot.rgb, shot.size)
             urls.append(upload_screenshot(png_bytes))
@@ -79,12 +92,17 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path == "/health":
+        parsed = urlsplit(self.path)
+        if parsed.path == "/health":
             self._json(200, {"ok": True})
             return
-        if self.path == "/capture":
+        if parsed.path == "/capture":
             try:
-                urls = capture_all_monitors()
+                qs = parse_qs(parsed.query)
+                exclude_point = None
+                if "x" in qs and "y" in qs:
+                    exclude_point = (int(float(qs["x"][0])), int(float(qs["y"][0])))
+                urls = capture_all_monitors(exclude_point)
                 self._json(200, {"ok": True, "urls": urls})
             except Exception as exc:
                 self._json(500, {"ok": False, "error": str(exc)})

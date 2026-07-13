@@ -5,7 +5,7 @@ import { getJournalEntry, saveJournalEntry, getTrades, uploadScreenshot } from '
 import { todayString, formatDate, addDays, calcStats, formatCurrency,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          tiltLabel, tiltClass, nl2br, debounce, getSignalDisplay,
-         calcTradeR, formatR, escapeHtml } from '../utils.js';
+         calcTradeR, formatR, escapeHtml, captureAllScreens } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
 import { getNewsForDate, eventTime, newsFetchStatus } from '../news.js';
 
@@ -16,10 +16,6 @@ let currentSins = [];
 let currentPlanImages = [null, null, null];
 let currentSessionLog = [];
 let pendingLogImages = [];
-
-// Local screen-capture helper (see tools/screen_capture_helper.py) — runs on
-// the trading PC and grabs all monitors without browser permission dialogs.
-const CAPTURE_HELPER_URL = 'http://127.0.0.1:8933';
 
 const DEFAULT_SINS = [
   'Exited too soon',
@@ -791,13 +787,15 @@ function initJournalInteractions(date) {
     const originalText = btn.textContent;
     btn.textContent = 'Capturing...';
     try {
-      const res = await fetch(`${CAPTURE_HELPER_URL}/capture`);
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'Capture failed');
-      data.urls.forEach(url => pendingLogImages.push({ file: null, localUrl: url, uploaded: true, url }));
-      const container = document.getElementById('log-pending-images');
-      if (container) container.innerHTML = buildLogPendingImages();
-      showToast(`Captured ${data.urls.length} screen${data.urls.length !== 1 ? 's' : ''}`, 'success');
+      const urls = await captureAllScreens();
+      if (!urls.length) {
+        showToast('No other screens to capture', 'warning');
+      } else {
+        urls.forEach(url => pendingLogImages.push({ file: null, localUrl: url, uploaded: true, url }));
+        const container = document.getElementById('log-pending-images');
+        if (container) container.innerHTML = buildLogPendingImages();
+        showToast(`Captured ${urls.length} screen${urls.length !== 1 ? 's' : ''}`, 'success');
+      }
     } catch (err) {
       showToast('Capture helper not reachable — is it running on your PC?', 'error');
     } finally {

@@ -2,6 +2,21 @@
 //  UTILITIES
 // =============================================
 
+// Local screen-capture helper (see tools/screen_capture_helper.py) — runs on
+// the trading PC and grabs all monitors without browser permission dialogs.
+export const CAPTURE_HELPER_URL = 'http://127.0.0.1:8933';
+
+// Excludes whichever monitor this browser window is currently on, so the
+// journal app itself never ends up in the captured screenshots.
+export async function captureAllScreens() {
+  const x = Math.round(window.screenX + window.outerWidth / 2);
+  const y = Math.round(window.screenY + window.outerHeight / 2);
+  const res = await fetch(`${CAPTURE_HELPER_URL}/capture?x=${x}&y=${y}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Capture failed');
+  return data.urls;
+}
+
 export function formatCurrency(val, decimals = 2, currency = '$') {
   if (val === null || val === undefined || val === '') return '—';
   const n = parseFloat(val);
