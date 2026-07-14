@@ -459,6 +459,11 @@ function setupTradeModal() {
             document.querySelector(`.dir-btn[data-dir="${trade.direction}"]`)?.classList.add('active');
           }
 
+          // Same outcome
+          if (trade.outcome) {
+            document.getElementById('trade-outcome').value = trade.outcome;
+          }
+
           // Same risk amount
           if (trade.risk_amount != null) {
             document.getElementById('trade-risk').value = trade.risk_amount;

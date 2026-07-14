@@ -5,7 +5,8 @@ import { getTrades, getJournalEntries, getStrategySetups } from '../db.js';
 import { calcStats, formatCurrency, formatDate, formatDateShort,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          todayString, getWeekRange, addDays, nl2br, getSignalDisplay,
-         calcTradeR, formatR, escapeHtml } from '../utils.js';
+         calcTradeR, formatR, escapeHtml,
+         imageGridColumns, imageGridPlaceholders } from '../utils.js';
 import { openTradeModal } from '../app.js';
 
 let currentWeekStart  = null;
@@ -449,6 +450,8 @@ function buildDayDetail(d) {
 
       ${dayTrades.length ? buildWeekTradeTable(dayTrades) : ''}
 
+      ${dayJournal ? buildTaggedNotes(dayJournal) : ''}
+
       ${dayJournal ? buildJournalSummary(dayJournal) : ''}
     </div>
   `;
@@ -480,6 +483,35 @@ function buildWeekTradeTable(trades) {
       </table>
     </div>
     ${trades.some(t => t.screenshots?.length) ? buildScreenshots(trades) : ''}
+  `;
+}
+
+function buildTaggedNotes(journal) {
+  const entries = (Array.isArray(journal.session_log) ? journal.session_log : [])
+    .filter(e => e && typeof e.tag === 'string' && e.tag.trim());
+  if (!entries.length) return '';
+
+  return `
+    <div style="margin-bottom:16px;display:flex;flex-direction:column;gap:12px">
+      ${entries.map(entry => {
+        const images = Array.isArray(entry.images) ? entry.images.filter(Boolean) : [];
+        return `
+        <div class="weekly-tagged-note">
+          <div class="weekly-tagged-note-header">${escapeHtml(entry.tag)}</div>
+          ${entry.comment ? `<div class="session-log-comment">${nl2br(entry.comment)}</div>` : ''}
+          ${images.length ? `
+          <div class="log-images-grid" style="grid-template-columns:repeat(${imageGridColumns(images.length)}, 1fr)">
+            ${images.map(url => `
+              <div class="log-image-item">
+                <img src="${url}" onclick='window._viewImage("${url}", ${JSON.stringify(images)})' alt="tagged note screenshot">
+              </div>
+            `).join('')}
+            ${imageGridPlaceholders(images.length)}
+          </div>` : ''}
+        </div>
+      `;
+      }).join('')}
+    </div>
   `;
 }
 

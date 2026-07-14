@@ -2013,6 +2013,26 @@ tbody td {
 
 .weekly-sins { margin-bottom: 20px; }
 
+/* Tagged session-log notes surfaced in Weekly Review */
+.weekly-tagged-note {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  padding: 16px;
+}
+
+.weekly-tagged-note-header {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--primary);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
 .weekly-sins-total {
   display: flex;
   flex-direction: column;

@@ -17,6 +17,16 @@ export async function captureAllScreens() {
   return data.urls;
 }
 
+// Always renders as a minimum 3-slot row (matching the trading-plan image
+// slots); grows past 3 to fit however many images an entry actually has.
+export function imageGridColumns(count) {
+  return Math.max(count, 3);
+}
+
+export function imageGridPlaceholders(count) {
+  return '<div class="log-image-item placeholder"></div>'.repeat(Math.max(0, 3 - count));
+}
+
 export function formatCurrency(val, decimals = 2, currency = '$') {
   if (val === null || val === undefined || val === '') return '—';
   const n = parseFloat(val);

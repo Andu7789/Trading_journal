@@ -5,7 +5,8 @@ import { getJournalEntry, saveJournalEntry, getTrades, uploadScreenshot } from '
 import { todayString, formatDate, addDays, calcStats, formatCurrency,
          pnlClass, pnlSign, getOutcomeBadge, getDirectionBadge,
          tiltLabel, tiltClass, nl2br, debounce, getSignalDisplay,
-         calcTradeR, formatR, escapeHtml, captureAllScreens } from '../utils.js';
+         calcTradeR, formatR, escapeHtml, captureAllScreens,
+         imageGridColumns, imageGridPlaceholders } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
 import { getNewsForDate, eventTime, newsFetchStatus } from '../news.js';
 
@@ -192,7 +193,10 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
             <textarea id="j-goals" class="form-textarea" rows="3" placeholder="What do you aim to achieve today? What setups will you look for? What is your max daily loss?">${entry.daily_goals || ''}</textarea>
           </div>
           <div class="form-group">
-            <label class="form-label">Trading Plan Screenshots</label>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <label class="form-label" style="margin-bottom:0">Trading Plan Screenshots</label>
+              <button type="button" class="btn btn-ghost btn-xs" id="plan-capture-screens-btn">🖥️ Capture All Screens</button>
+            </div>
             <div class="text-xs text-muted">Add up to 3 images for today's plan — click one to enlarge.</div>
             <div id="plan-images-container">${buildPlanImages()}</div>
           </div>
@@ -213,6 +217,7 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
           <div class="text-sm text-muted">Add notes and screenshots as the day unfolds — each entry becomes a new row below.</div>
           <div id="session-log-list">${buildSessionLogList()}</div>
           <div class="session-log-add">
+            <input type="text" id="new-log-tag" class="form-input" placeholder="Tag (optional) — e.g. Key Lesson, Mistake — shows this entry in Weekly Review">
             <textarea id="new-log-comment" class="form-textarea" rows="2" placeholder="What's happening right now? Add a quick note..."></textarea>
             <div class="session-log-add-zone">
               <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -362,6 +367,7 @@ function normalizeSessionLog(log) {
       time: e.time || '',
       comment: e.comment || '',
       images: Array.isArray(e.images) ? e.images.filter(Boolean) : [],
+      tag: typeof e.tag === 'string' ? e.tag.trim() : '',
     }));
 }
 
@@ -388,14 +394,6 @@ function buildPlanImages() {
   return `<div class="plan-images-grid">${slots}</div>`;
 }
 
-function logGridColumns(count) {
-  return Math.max(count, 3);
-}
-
-function logGridPlaceholders(count) {
-  return '<div class="log-image-item placeholder"></div>'.repeat(Math.max(0, 3 - count));
-}
-
 function buildSessionLogList() {
   if (!currentSessionLog.length) {
     return '<div class="empty-state" style="padding:16px 0"><p class="text-muted text-sm">No entries yet — add one below as your day unfolds.</p></div>';
@@ -406,17 +404,18 @@ function buildSessionLogList() {
         <div class="session-log-row">
           <div class="session-log-row-header">
             <span class="session-log-time">${escapeHtml(entry.time)}</span>
+            ${entry.tag ? `<span class="badge badge-open">${escapeHtml(entry.tag)}</span>` : ''}
             <button type="button" class="btn btn-ghost btn-xs session-log-delete" data-index="${idx}">Delete</button>
           </div>
           ${entry.comment ? `<div class="session-log-comment">${nl2br(entry.comment)}</div>` : ''}
           ${entry.images.length ? `
-          <div class="log-images-grid" style="grid-template-columns:repeat(${logGridColumns(entry.images.length)}, 1fr)">
+          <div class="log-images-grid" style="grid-template-columns:repeat(${imageGridColumns(entry.images.length)}, 1fr)">
             ${entry.images.map((url, imgIdx) => `
               <div class="log-image-item">
                 <img src="${url}" onclick="window._journalViewLogImage(${idx}, ${imgIdx})" alt="log screenshot">
               </div>
             `).join('')}
-            ${logGridPlaceholders(entry.images.length)}
+            ${imageGridPlaceholders(entry.images.length)}
           </div>` : ''}
         </div>
       `).join('')}
@@ -427,14 +426,14 @@ function buildSessionLogList() {
 function buildLogPendingImages() {
   if (!pendingLogImages.length) return '';
   return `
-    <div class="log-images-grid" style="grid-template-columns:repeat(${logGridColumns(pendingLogImages.length)}, 1fr);margin-top:8px">
+    <div class="log-images-grid" style="grid-template-columns:repeat(${imageGridColumns(pendingLogImages.length)}, 1fr);margin-top:8px">
       ${pendingLogImages.map((item, idx) => `
         <div class="log-image-item">
           <img src="${item.localUrl}" alt="pending">
           <button type="button" class="plan-image-remove" onclick="window._journalRemoveLogPendingImage(${idx})">&times;</button>
         </div>
       `).join('')}
-      ${logGridPlaceholders(pendingLogImages.length)}
+      ${imageGridPlaceholders(pendingLogImages.length)}
     </div>
   `;
 }
@@ -756,6 +755,39 @@ function initJournalInteractions(date) {
     const gallery = currentPlanImages.filter(Boolean);
     window._viewImage(currentPlanImages[idx], gallery);
   };
+  document.getElementById('plan-capture-screens-btn').onclick = async () => {
+    const btn = document.getElementById('plan-capture-screens-btn');
+    const emptySlots = [0, 1, 2].filter(i => !currentPlanImages[i]);
+    if (!emptySlots.length) {
+      showToast('All 3 plan image slots are full — remove one first', 'warning');
+      return;
+    }
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Capturing...';
+    try {
+      const urls = await captureAllScreens();
+      if (!urls.length) {
+        showToast('No other screens to capture', 'warning');
+      } else {
+        const used = Math.min(urls.length, emptySlots.length);
+        for (let i = 0; i < used; i++) currentPlanImages[emptySlots[i]] = urls[i];
+        document.getElementById('plan-images-container').innerHTML = buildPlanImages();
+        triggerAutosave(date);
+        showToast(
+          urls.length > used
+            ? `Added ${used} screen${used !== 1 ? 's' : ''} — only ${used} slot${used !== 1 ? 's' : ''} available`
+            : `Captured ${used} screen${used !== 1 ? 's' : ''}`,
+          'success'
+        );
+      }
+    } catch (err) {
+      showToast('Capture helper not reachable — is it running on your PC?', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  };
 
   // Session log
   window._journalViewLogImage = (rowIdx, imgIdx) => {
@@ -805,7 +837,9 @@ function initJournalInteractions(date) {
   };
   document.getElementById('add-log-entry-btn').onclick = async () => {
     const textarea = document.getElementById('new-log-comment');
+    const tagInput = document.getElementById('new-log-tag');
     const comment = textarea?.value.trim() || '';
+    const tag = tagInput?.value.trim() || '';
     if (!comment && !pendingLogImages.length) {
       showToast('Add a comment or an image first', 'warning');
       return;
@@ -823,9 +857,11 @@ function initJournalInteractions(date) {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         comment,
         images,
+        tag,
       });
       pendingLogImages = [];
       textarea.value = '';
+      if (tagInput) tagInput.value = '';
       const pendingContainer = document.getElementById('log-pending-images');
       if (pendingContainer) pendingContainer.innerHTML = buildLogPendingImages();
       renderSessionLog(date);
