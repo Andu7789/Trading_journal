@@ -19,9 +19,9 @@ const DEFAULT_PAIRS = ['EURUSD', 'GBPUSD'];
 function updateExtremePriceLabel(direction) {
   const label = document.getElementById('st-extreme-price-label');
   if (!label) return;
-  label.textContent = direction === 'long' ? 'Lowest Price Reached'
-    : direction === 'short' ? 'Highest Price Reached'
-    : 'Lowest / Highest Price Reached';
+  label.textContent = direction === 'long' ? 'Lowest Reached'
+    : direction === 'short' ? 'Highest Reached'
+    : 'Extreme Price';
 }
 
 function _updateStSignalScore() {
