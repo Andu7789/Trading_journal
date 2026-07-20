@@ -16,6 +16,14 @@ let pendingSetupScreenshots = [];  // { file, localUrl, uploaded, url? }
 
 const DEFAULT_PAIRS = ['EURUSD', 'GBPUSD'];
 
+function updateExtremePriceLabel(direction) {
+  const label = document.getElementById('st-extreme-price-label');
+  if (!label) return;
+  label.textContent = direction === 'long' ? 'Lowest Price Reached'
+    : direction === 'short' ? 'Highest Price Reached'
+    : 'Lowest / Highest Price Reached';
+}
+
 function _updateStSignalScore() {
   const btns  = document.querySelectorAll('.st-signal-toggle');
   const count = Array.from(btns).filter(b => b.classList.contains('active')).length;
@@ -70,6 +78,9 @@ function buildShell() {
     <div id="st-alltime-stats" class="stats-grid" style="margin-bottom:20px">
       <div class="loading-screen" style="padding:20px"><div class="loading-spinner"></div></div>
     </div>
+
+    <!-- Stop-loss efficiency -->
+    <div id="st-stop-efficiency" style="margin-bottom:20px"></div>
 
     <!-- Monthly Overview -->
     <div class="card" style="margin-bottom:20px;padding:20px">
@@ -174,6 +185,7 @@ async function loadAllTimeAndChart() {
     try { renderChartSection(allSetups); } catch (e) { if (chartEl) chartEl.innerHTML = `<p class="text-loss text-sm" style="padding:20px">${e.message}</p>`; }
     try { renderBreakdownCharts(allSetups); } catch (e) { console.error('Breakdown charts:', e); }
     try { renderStConfluence(allSetups); } catch (e) { console.error('Confluence:', e); }
+    try { renderStopEfficiency(allSetups); } catch (e) { console.error('Stop efficiency:', e); }
   } catch (err) {
     if (statsEl) statsEl.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
   }
@@ -1056,6 +1068,115 @@ function showStConfluenceDrilldown(comboIdx) {
 }
 
 // =============================================
+//  STOP-LOSS EFFICIENCY
+// =============================================
+
+// How much of the stop distance a setup actually used before resolving.
+// Wins with a low % had room to use a tighter stop; losses should sit near
+// 100% (that's the stop doing its job).
+function calcStopEfficiency(setup) {
+  const entry   = parseFloat(setup.entry_price);
+  const stop    = parseFloat(setup.stop_loss);
+  const extreme = parseFloat(setup.extreme_price);
+  if (isNaN(entry) || isNaN(stop) || isNaN(extreme) || !setup.direction) return null;
+
+  const stopDistance = Math.abs(entry - stop);
+  if (!stopDistance) return null;
+
+  const rawExcursion = setup.direction === 'long' ? entry - extreme : extreme - entry;
+  const excursion  = Math.max(0, rawExcursion);
+  const efficiency = Math.min(100, (excursion / stopDistance) * 100);
+
+  return { stopDistance, excursion, efficiency };
+}
+
+function renderStopEfficiency(allSetups) {
+  const el = document.getElementById('st-stop-efficiency');
+  if (!el) return;
+
+  const analyzed = allSetups
+    .filter(s => s.outcome && s.outcome !== 'pending')
+    .map(s => ({ setup: s, calc: calcStopEfficiency(s) }))
+    .filter(x => x.calc !== null);
+
+  if (!analyzed.length) { el.innerHTML = ''; return; }
+
+  const wins   = analyzed.filter(x => x.setup.outcome === 'win');
+  const losses = analyzed.filter(x => x.setup.outcome === 'loss');
+
+  const avgWinEff  = wins.length ? wins.reduce((s, x) => s + x.calc.efficiency, 0) / wins.length : null;
+  const avgLossEff = losses.length ? losses.reduce((s, x) => s + x.calc.efficiency, 0) / losses.length : null;
+
+  const byPair = {};
+  wins.forEach(x => {
+    const p = x.setup.pair || 'Unknown';
+    (byPair[p] || (byPair[p] = [])).push(x.calc.efficiency);
+  });
+  const pairRows = Object.entries(byPair)
+    .map(([pair, effs]) => ({ pair, avg: effs.reduce((a, b) => a + b, 0) / effs.length, count: effs.length }))
+    .sort((a, b) => a.avg - b.avg);
+
+  const worstWins = [...wins].sort((a, b) => a.calc.efficiency - b.calc.efficiency).slice(0, 8);
+
+  el.innerHTML = `
+    <div class="card" style="padding:20px">
+      <div class="card-title" style="font-size:14px;margin-bottom:4px">Stop-Loss Efficiency</div>
+      <div class="card-subtitle" style="margin-bottom:16px">How much of your stop distance winning trades actually used. Low % means room to tighten.</div>
+      <div class="stats-grid" style="margin-bottom:20px">
+        <div class="stat-card ${avgWinEff !== null && avgWinEff < 60 ? 'warning' : 'profit'}">
+          <div class="stat-label">Avg Stop Used (Wins)</div>
+          <div class="stat-value neutral">${avgWinEff !== null ? avgWinEff.toFixed(0) + '%' : '—'}</div>
+          <div class="stat-sub">${wins.length} winning setup${wins.length !== 1 ? 's' : ''} with price data</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Stop Used (Losses)</div>
+          <div class="stat-value neutral">${avgLossEff !== null ? avgLossEff.toFixed(0) + '%' : '—'}</div>
+          <div class="stat-sub">Should sit near 100%, confirming stops fire correctly</div>
+        </div>
+      </div>
+      ${pairRows.length ? `
+      <div style="margin-bottom:20px">
+        <div class="text-xs text-muted" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Avg Stop Used by Pair (Wins)</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${pairRows.map(r => `
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="min-width:80px;font-size:12px;font-weight:600">${escapeHtml(r.pair)}</span>
+              <div style="flex:1;height:8px;background:var(--bg-input);border-radius:4px;overflow:hidden">
+                <div style="width:${r.avg}%;height:100%;background:${r.avg < 60 ? 'var(--warning)' : 'var(--primary)'}"></div>
+              </div>
+              <span class="td-mono" style="min-width:44px;text-align:right;font-size:12px">${r.avg.toFixed(0)}%</span>
+              <span class="text-xs text-muted" style="min-width:60px">${r.count} win${r.count !== 1 ? 's' : ''}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
+      ${worstWins.length ? `
+      <div>
+        <div class="text-xs text-muted" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Winning Trades With Most Stop Room Left</div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Date</th><th>Pair</th><th>Dir</th><th>Entry</th><th>Stop</th><th>Extreme</th><th>Stop Used</th></tr></thead>
+            <tbody>
+              ${worstWins.map(x => `
+                <tr>
+                  <td class="td-mono" style="font-size:12px">${formatDate(x.setup.date)}</td>
+                  <td><strong>${escapeHtml(x.setup.pair || '')}</strong></td>
+                  <td>${getDirectionBadge(x.setup.direction)}</td>
+                  <td class="td-mono">${x.setup.entry_price}</td>
+                  <td class="td-mono">${x.setup.stop_loss}</td>
+                  <td class="td-mono">${x.setup.extreme_price}</td>
+                  <td class="td-mono" style="color:${x.calc.efficiency < 60 ? 'var(--warning)' : 'var(--text-primary)'}">${x.calc.efficiency.toFixed(0)}%</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>` : ''}
+    </div>
+  `;
+}
+
+// =============================================
 //  WEEK VIEW
 // =============================================
 async function loadWeek() {
@@ -1289,6 +1410,10 @@ function openSetupModal(setup = null) {
   document.getElementById('st-minute').value      = '';
   document.getElementById('st-direction').value   = '';
   document.getElementById('st-possible-r').value  = '';
+  document.getElementById('st-entry-price').value = '';
+  document.getElementById('st-stop-loss').value   = '';
+  document.getElementById('st-extreme-price').value = '';
+  updateExtremePriceLabel('');
   document.getElementById('st-outcome').value     = 'win';
   document.getElementById('st-notes').value       = '';
   document.getElementById('st-screenshot-previews').innerHTML = '';
@@ -1325,6 +1450,10 @@ function openSetupModal(setup = null) {
     document.getElementById('st-possible-r').value = setup.possible_r ?? '';
     document.getElementById('st-outcome').value    = setup.outcome || 'pending';
     document.getElementById('st-notes').value      = setup.notes || '';
+    document.getElementById('st-entry-price').value   = setup.entry_price ?? '';
+    document.getElementById('st-stop-loss').value      = setup.stop_loss ?? '';
+    document.getElementById('st-extreme-price').value  = setup.extreme_price ?? '';
+    updateExtremePriceLabel(setup.direction || '');
 
     if (setup.direction) {
       document.querySelector(`.st-dir-btn[data-dir="${setup.direction}"]`)?.classList.add('active');
@@ -1380,6 +1509,7 @@ function openSetupModal(setup = null) {
       document.querySelectorAll('.st-dir-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('st-direction').value = btn.dataset.dir;
+      updateExtremePriceLabel(btn.dataset.dir);
     };
   });
 
@@ -1493,6 +1623,9 @@ async function handleSaveSetup() {
       possible_r:  parseFloat(document.getElementById('st-possible-r').value) || null,
       outcome:     document.getElementById('st-outcome').value || 'win',
       notes:       document.getElementById('st-notes').value.trim() || null,
+      entry_price:   parseFloat(document.getElementById('st-entry-price').value) || null,
+      stop_loss:     parseFloat(document.getElementById('st-stop-loss').value) || null,
+      extreme_price: parseFloat(document.getElementById('st-extreme-price').value) || null,
       screenshots: screenshotUrls,
       signals:     Array.from(document.querySelectorAll('.st-signal-toggle.active')).map(b => b.dataset.signal),
     };
