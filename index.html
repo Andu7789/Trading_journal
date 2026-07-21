@@ -541,6 +541,88 @@
       </div>
     </div>
 
+    <!-- ===== BULK ENTER SETUPS MODAL ===== -->
+    <div id="st-bulk-modal" class="modal hidden">
+      <div class="modal-backdrop" id="st-bulk-modal-backdrop"></div>
+      <div class="modal-dialog" style="width:min(1160px,96vw)">
+        <div class="modal-header">
+          <h2>Bulk Enter Setups</h2>
+          <button class="modal-close" id="st-bulk-modal-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="text-sm text-muted" style="margin-bottom:14px">
+            Fill in a row per setup. Target Price is calculated automatically from Entry, Stop Loss and Possible R.
+            Blank rows are skipped. Notes and screenshots aren't part of bulk entry: edit a setup individually to add those.
+          </p>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th style="min-width:130px">Date</th>
+                  <th style="min-width:90px">Time</th>
+                  <th style="min-width:110px">Pair</th>
+                  <th style="min-width:90px">Direction</th>
+                  <th style="min-width:90px">Possible R</th>
+                  <th style="min-width:110px">Entry Price</th>
+                  <th style="min-width:110px">Stop Loss</th>
+                  <th style="min-width:110px">Extreme Price</th>
+                  <th style="min-width:110px">Target Price</th>
+                  <th style="min-width:110px">Outcome</th>
+                  <th style="width:36px"></th>
+                </tr>
+              </thead>
+              <tbody id="st-bulk-rows"></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="st-bulk-add-row" style="margin-top:12px">+ Add Row</button>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="st-bulk-cancel">Cancel</button>
+          <button class="btn btn-primary" id="st-bulk-save">Save All</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== EXPORT SETUPS MODAL ===== -->
+    <div id="st-export-modal" class="modal hidden">
+      <div class="modal-backdrop" id="st-export-modal-backdrop"></div>
+      <div class="modal-dialog" style="width:min(420px,95vw)">
+        <div class="modal-header">
+          <h2>Export for Analysis</h2>
+          <button class="modal-close" id="st-export-modal-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">Range</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+              <button type="button" class="btn btn-ghost btn-sm st-export-preset active" data-range="all">All Time</button>
+              <button type="button" class="btn btn-ghost btn-sm st-export-preset" data-range="month">This Month</button>
+              <button type="button" class="btn btn-ghost btn-sm st-export-preset" data-range="week">This Week</button>
+              <button type="button" class="btn btn-ghost btn-sm st-export-preset" data-range="custom">Custom</button>
+            </div>
+          </div>
+          <div id="st-export-custom-range" class="form-grid-2" style="display:none;margin-bottom:4px">
+            <div class="form-group">
+              <label class="form-label">From</label>
+              <input type="date" id="st-export-start" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">To</label>
+              <input type="date" id="st-export-end" class="form-input">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="st-export-cancel">Cancel</button>
+          <button class="btn btn-primary" id="st-export-download">Download</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== DAY DETAIL MODAL ===== -->
     <div id="day-modal" class="modal hidden">
       <div class="modal-backdrop" onclick="document.getElementById('day-modal').classList.add('hidden')"></div>

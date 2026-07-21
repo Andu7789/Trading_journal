@@ -68,10 +68,20 @@ function buildShell() {
         <h1>Strategy Tracker</h1>
         <div class="page-header-sub">Track setups that meet your rules</div>
       </div>
-      <button class="btn btn-ghost btn-sm" id="st-manage-pairs-btn" title="Manage pairs">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Pairs
-      </button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" id="st-export-btn" title="Export setups for LLM analysis">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export for Analysis
+        </button>
+        <button class="btn btn-ghost btn-sm" id="st-bulk-open-btn" title="Bulk enter setups">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Bulk Enter
+        </button>
+        <button class="btn btn-ghost btn-sm" id="st-manage-pairs-btn" title="Manage pairs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Pairs
+        </button>
+      </div>
     </div>
 
     <!-- All-time stats -->
@@ -142,6 +152,8 @@ function buildShell() {
 function wireShell() {
   window._stOpenAddModal = () => openSetupModal(null);
   document.getElementById('st-manage-pairs-btn').onclick = openPairModal;
+  document.getElementById('st-bulk-open-btn').onclick = openBulkModal;
+  document.getElementById('st-export-btn').onclick = openExportModal;
 
   document.getElementById('st-month-prev').onclick = () => navigateStMonth(-1);
   document.getElementById('st-month-next').onclick = () => navigateStMonth(1);
@@ -167,6 +179,8 @@ function handleEscKey(e) {
   if (e.key === 'Escape') {
     closeSetupModal();
     closePairModal();
+    closeBulkModal();
+    closeExportModal();
   }
 }
 
@@ -1389,6 +1403,25 @@ function ensureModalsInDom() {
   document.getElementById('st-pair-modal-close').onclick    = closePairModal;
   document.getElementById('st-pair-add-btn').onclick        = addNewPair;
 
+  document.getElementById('st-bulk-modal-backdrop').onclick = closeBulkModal;
+  document.getElementById('st-bulk-modal-close').onclick    = closeBulkModal;
+  document.getElementById('st-bulk-cancel').onclick         = closeBulkModal;
+  document.getElementById('st-bulk-add-row').onclick        = () => addBulkRow();
+  document.getElementById('st-bulk-save').onclick           = handleSaveBulk;
+  wireBulkRowsDelegation();
+
+  document.getElementById('st-export-modal-backdrop').onclick = closeExportModal;
+  document.getElementById('st-export-modal-close').onclick    = closeExportModal;
+  document.getElementById('st-export-cancel').onclick         = closeExportModal;
+  document.getElementById('st-export-download').onclick       = handleExportSetups;
+  document.querySelectorAll('.st-export-preset').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.st-export-preset').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('st-export-custom-range').style.display = btn.dataset.range === 'custom' ? '' : 'none';
+    };
+  });
+
   // Allow Enter key to add pair
   document.getElementById('st-new-pair-input')?.addEventListener('keypress', e => {
     if (e.key === 'Enter') addNewPair();
@@ -1522,6 +1555,325 @@ function openSetupModal(setup = null) {
 function closeSetupModal() {
   document.getElementById('st-modal')?.classList.add('hidden');
   pendingSetupScreenshots = [];
+}
+
+// =============================================
+//  EXPORT FOR LLM ANALYSIS
+// =============================================
+function openExportModal() {
+  document.querySelectorAll('.st-export-preset').forEach(b => b.classList.toggle('active', b.dataset.range === 'all'));
+  document.getElementById('st-export-custom-range').style.display = 'none';
+  document.getElementById('st-export-start').value = '';
+  document.getElementById('st-export-end').value   = '';
+  document.getElementById('st-export-modal').classList.remove('hidden');
+}
+
+function closeExportModal() {
+  document.getElementById('st-export-modal')?.classList.add('hidden');
+}
+
+// Resolves the active preset (or custom inputs) to a { startDate, endDate, label }
+// the same shape getStrategySetups() filters already accept.
+function resolveExportRange() {
+  const active = document.querySelector('.st-export-preset.active')?.dataset.range || 'all';
+
+  if (active === 'month') {
+    const now = new Date();
+    const { start, end } = getMonthRange(now.getFullYear(), now.getMonth() + 1);
+    return { startDate: start, endDate: end, label: `This month (${start} to ${end})` };
+  }
+  if (active === 'week') {
+    const { start, end } = getWeekRange(todayString());
+    return { startDate: start, endDate: end, label: `This week (${start} to ${end})` };
+  }
+  if (active === 'custom') {
+    const start = document.getElementById('st-export-start').value || null;
+    const end   = document.getElementById('st-export-end').value || null;
+    const label = start || end ? `Custom (${start || 'earliest'} to ${end || 'latest'})` : 'All time';
+    return { startDate: start, endDate: end, label };
+  }
+  return { startDate: null, endDate: null, label: 'All time' };
+}
+
+async function handleExportSetups() {
+  const range = resolveExportRange();
+  try {
+    const filters = {};
+    if (range.startDate) filters.startDate = range.startDate;
+    if (range.endDate)   filters.endDate   = range.endDate;
+
+    const setups = await getStrategySetups(filters);
+    if (!setups.length) { showToast('No setups in that range to export', 'warning'); return; }
+
+    const exportedAt = new Date();
+    const content     = buildSetupsLlmExport(setups, exportedAt, range.label);
+    const dateStamp   = exportedAt.toISOString().slice(0, 10);
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = `strategy-setups-llm-export-${dateStamp}.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+
+    closeExportModal();
+    showToast('Strategy setups export downloaded', 'success');
+  } catch (err) {
+    showToast('Export failed: ' + err.message, 'error');
+  }
+}
+
+function buildSetupsLlmExport(setups, exportedAt, rangeLabel) {
+  const stats  = calcSetupStats(setups);
+  const sorted = [...setups].sort((a, b) =>
+    a.date !== b.date ? a.date.localeCompare(b.date) : (a.trade_time || '').localeCompare(b.trade_time || ''));
+
+  const lines = [
+    '# Strategy Tracker Export',
+    '',
+    `Exported: ${exportedAt.toLocaleString('en-GB')}`,
+    `Range: ${rangeLabel || 'All time'}`,
+    `Total setups: ${stats.total}`,
+    `Closed: ${stats.closed} (${stats.wins}W / ${stats.losses}L / ${stats.bes}BE) - Pending: ${stats.pending}`,
+    `Win rate: ${stats.closed ? stats.winRate.toFixed(1) + '%' : 'n/a'}`,
+    `Total R: ${stats.closed ? (stats.totalR >= 0 ? '+' : '') + stats.totalR.toFixed(2) + 'R' : 'n/a'}`,
+    '',
+    '## Analysis Request',
+    '',
+    'Please analyse these trading setups and find recurring patterns. Focus on: which signal combinations and pairs perform best, whether stops are too tight or too loose relative to what price actually did (Stop Used %), whether Possible R is estimated accurately versus how far price actually ran (Target Price vs Extreme Price), timing patterns (day of week, time of day), and any other edges or leaks you can find. Recommend concrete, specific rule changes.',
+    '',
+    '## Field Notes',
+    '',
+    '- Target Price is the level implied by Entry Price, Stop Loss and Possible R at time of entry: the price the trade needed to reach to hit its planned R.',
+    '- Stop Used % is how much of the Entry-to-Stop distance price actually used before the trade resolved (based on Extreme Price). Near 100% on losses is expected, since that is the stop doing its job. Low % on wins shows room to tighten the stop.',
+    '- Losses are recorded as -1R by convention regardless of Possible R, since the stop defines the realised loss.',
+    '',
+    '## Data (CSV)',
+    '',
+    '```csv',
+    buildSetupsCsv(sorted),
+    '```',
+  ];
+
+  return lines.join('\n');
+}
+
+const SETUPS_CSV_HEADERS = [
+  'date', 'trade_time', 'pair', 'direction', 'possible_r',
+  'entry_price', 'stop_loss', 'extreme_price', 'target_price', 'stop_used_pct',
+  'outcome', 'signals', 'notes',
+];
+
+function buildSetupsCsv(setups) {
+  const rows = setups.map(s => {
+    const entry  = parseFloat(s.entry_price);
+    const stop   = parseFloat(s.stop_loss);
+    const pr     = parseFloat(s.possible_r);
+    const target = calcTargetPrice(entry, stop, pr, s.direction);
+    const eff    = calcStopEfficiency(s);
+
+    const vals = {
+      date:          s.date || '',
+      trade_time:    s.trade_time || '',
+      pair:          s.pair || '',
+      direction:     s.direction || '',
+      possible_r:    s.possible_r ?? '',
+      entry_price:   s.entry_price ?? '',
+      stop_loss:     s.stop_loss ?? '',
+      extreme_price: s.extreme_price ?? '',
+      target_price:  target !== null ? target.toFixed(5) : '',
+      stop_used_pct: eff ? eff.efficiency.toFixed(1) : '',
+      outcome:       s.outcome || '',
+      signals:       Array.isArray(s.signals) ? s.signals.join(';') : '',
+      notes:         _csvSingleLine(s.notes),
+    };
+
+    return SETUPS_CSV_HEADERS.map(h => _csvEscape(vals[h])).join(',');
+  });
+
+  return [SETUPS_CSV_HEADERS.join(','), ...rows].join('\n');
+}
+
+function _csvSingleLine(value) {
+  return String(value || '').replace(/\r\n|\r|\n/g, ' ').trim();
+}
+
+function _csvEscape(value) {
+  const s = String(value ?? '');
+  return (s.includes(',') || s.includes('"') || s.includes('\n')) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// =============================================
+//  BULK ENTER MODAL
+// =============================================
+
+// Target price implied by the planned Entry / Stop / Possible R — the level
+// that would close out exactly at the stated R multiple, in the trade's direction.
+function calcTargetPrice(entry, stop, possibleR, direction) {
+  if (isNaN(entry) || isNaN(stop) || isNaN(possibleR) || !direction) return null;
+  const stopDistance = Math.abs(entry - stop);
+  if (!stopDistance) return null;
+  const sign = direction === 'long' ? 1 : -1;
+  return entry + sign * stopDistance * possibleR;
+}
+
+function openBulkModal() {
+  const tbody = document.getElementById('st-bulk-rows');
+  tbody.innerHTML = '';
+  for (let i = 0; i < 5; i++) addBulkRow();
+  document.getElementById('st-bulk-modal').classList.remove('hidden');
+}
+
+function closeBulkModal() {
+  document.getElementById('st-bulk-modal')?.classList.add('hidden');
+}
+
+function buildBulkRowHtml() {
+  const pairOptions = getPairs().map(p => `<option value="${p}">${p}</option>`).join('');
+  return `
+    <tr data-bulk-row>
+      <td><input type="date" class="form-input bulk-date" value="${todayString()}" style="min-width:126px"></td>
+      <td><input type="time" class="form-input bulk-time" style="min-width:86px"></td>
+      <td><select class="form-input bulk-pair" style="min-width:100px">${pairOptions}</select></td>
+      <td>
+        <select class="form-input bulk-direction" style="min-width:86px">
+          <option value="">--</option>
+          <option value="long">Long</option>
+          <option value="short">Short</option>
+        </select>
+      </td>
+      <td><input type="number" step="0.1" class="form-input bulk-r" placeholder="2.5" style="min-width:80px"></td>
+      <td><input type="number" step="any" class="form-input bulk-entry" placeholder="1.0850" style="min-width:100px"></td>
+      <td><input type="number" step="any" class="form-input bulk-stop" placeholder="1.0820" style="min-width:100px"></td>
+      <td><input type="number" step="any" class="form-input bulk-extreme" placeholder="1.0835" style="min-width:100px"></td>
+      <td><span class="bulk-target td-mono text-muted">—</span></td>
+      <td>
+        <select class="form-input bulk-outcome" style="min-width:100px">
+          <option value="win" selected>Win</option>
+          <option value="loss">Loss</option>
+          <option value="breakeven">Breakeven</option>
+          <option value="pending">Pending</option>
+        </select>
+      </td>
+      <td><button type="button" class="btn btn-ghost btn-xs bulk-row-remove" title="Remove row">✕</button></td>
+    </tr>
+  `;
+}
+
+function addBulkRow() {
+  document.getElementById('st-bulk-rows').insertAdjacentHTML('beforeend', buildBulkRowHtml());
+}
+
+function recomputeRowTarget(row) {
+  if (!row) return;
+  const entry     = parseFloat(row.querySelector('.bulk-entry').value);
+  const stop      = parseFloat(row.querySelector('.bulk-stop').value);
+  const possibleR = parseFloat(row.querySelector('.bulk-r').value);
+  const direction = row.querySelector('.bulk-direction').value;
+  const target    = calcTargetPrice(entry, stop, possibleR, direction);
+  row.querySelector('.bulk-target').textContent = target !== null ? target.toFixed(5) : '—';
+}
+
+// Rows are added/removed dynamically, so this binds once to the tbody
+// and reads whichever row the event actually happened in.
+function wireBulkRowsDelegation() {
+  const tbody = document.getElementById('st-bulk-rows');
+  if (!tbody || tbody._wired) return;
+  tbody._wired = true;
+
+  tbody.addEventListener('input', (e) => {
+    const row = e.target.closest('tr');
+    if (!row) return;
+    if (e.target.matches('.bulk-entry, .bulk-stop, .bulk-r')) recomputeRowTarget(row);
+    if (e.target.matches('.bulk-r')) {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val < 0) row.querySelector('.bulk-outcome').value = 'loss';
+    }
+  });
+
+  tbody.addEventListener('change', (e) => {
+    const row = e.target.closest('tr');
+    if (!row) return;
+    if (e.target.matches('.bulk-direction')) recomputeRowTarget(row);
+    if (e.target.matches('.bulk-outcome') && e.target.value === 'loss') {
+      const rInput = row.querySelector('.bulk-r');
+      if (!rInput.value || parseFloat(rInput.value) >= 0) {
+        rInput.value = -1;
+        recomputeRowTarget(row);
+      }
+    }
+  });
+
+  tbody.addEventListener('click', (e) => {
+    if (e.target.closest('.bulk-row-remove')) e.target.closest('tr')?.remove();
+  });
+}
+
+async function handleSaveBulk() {
+  const saveBtn = document.getElementById('st-bulk-save');
+  const rows = Array.from(document.querySelectorAll('#st-bulk-rows tr[data-bulk-row]'));
+
+  const toSave = [];
+  for (const row of rows) {
+    const pair    = row.querySelector('.bulk-pair').value;
+    const date    = row.querySelector('.bulk-date').value;
+    const time    = row.querySelector('.bulk-time').value;
+    const rVal    = row.querySelector('.bulk-r').value;
+    const entry   = row.querySelector('.bulk-entry').value;
+    const stop    = row.querySelector('.bulk-stop').value;
+    const extreme = row.querySelector('.bulk-extreme').value;
+
+    // A row with none of the price/R fields touched is an unused default row — skip it.
+    if (!rVal && !entry && !stop && !extreme) continue;
+
+    if (!pair) { showToast('Every filled-in row needs a pair', 'error'); return; }
+    if (!date) { showToast('Every filled-in row needs a date', 'error'); return; }
+
+    toSave.push({
+      date,
+      trade_time:    time || null,
+      pair,
+      direction:     row.querySelector('.bulk-direction').value || null,
+      possible_r:    parseFloat(rVal) || null,
+      outcome:       row.querySelector('.bulk-outcome').value || 'win',
+      entry_price:   parseFloat(entry) || null,
+      stop_loss:     parseFloat(stop) || null,
+      extreme_price: parseFloat(extreme) || null,
+      notes:         null,
+      screenshots:   [],
+      signals:       [],
+    });
+  }
+
+  if (!toSave.length) { showToast('No rows to save', 'warning'); return; }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+
+  let ok = 0, fail = 0;
+  for (const setupData of toSave) {
+    try {
+      await saveStrategySetup(setupData);
+      ok++;
+    } catch (err) {
+      fail++;
+      console.error('Bulk save row failed:', err, setupData);
+    }
+  }
+
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'Save All';
+
+  if (ok) showToast(`${ok} setup${ok !== 1 ? 's' : ''} added${fail ? `, ${fail} failed` : ''}`, fail ? 'warning' : 'success');
+  else showToast('Failed to save setups', 'error');
+
+  if (ok) {
+    closeBulkModal();
+    await loadAll();
+  }
 }
 
 async function _loadCopyFromOptions(date) {
