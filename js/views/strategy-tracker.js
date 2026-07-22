@@ -1408,6 +1408,7 @@ function ensureModalsInDom() {
   document.getElementById('st-bulk-cancel').onclick         = closeBulkModal;
   document.getElementById('st-bulk-add-row').onclick        = () => addBulkRow();
   document.getElementById('st-bulk-save').onclick           = handleSaveBulk;
+  document.getElementById('st-bulk-load-btn').onclick       = handleLoadBulkSetups;
   wireBulkRowsDelegation();
 
   document.getElementById('st-export-modal-backdrop').onclick = closeExportModal;
@@ -1723,6 +1724,8 @@ function calcTargetPrice(entry, stop, possibleR, direction) {
 function openBulkModal() {
   const tbody = document.getElementById('st-bulk-rows');
   tbody.innerHTML = '';
+  document.getElementById('st-bulk-load-start').value = '';
+  document.getElementById('st-bulk-load-end').value   = '';
   for (let i = 0; i < 5; i++) addBulkRow();
   document.getElementById('st-bulk-modal').classList.remove('hidden');
 }
@@ -1731,40 +1734,86 @@ function closeBulkModal() {
   document.getElementById('st-bulk-modal')?.classList.add('hidden');
 }
 
-function buildBulkRowHtml() {
-  const pairOptions = getPairs().map(p => `<option value="${p}">${p}</option>`).join('');
+async function handleLoadBulkSetups() {
+  const start = document.getElementById('st-bulk-load-start').value;
+  const end   = document.getElementById('st-bulk-load-end').value;
+  if (!start || !end) { showToast('Pick a From and To date to load', 'error'); return; }
+
+  const hasUnsavedInput = Array.from(document.querySelectorAll('#st-bulk-rows tr[data-bulk-row]')).some(row =>
+    row.dataset.setupId || row.querySelector('.bulk-r').value || row.querySelector('.bulk-entry').value ||
+    row.querySelector('.bulk-stop').value || row.querySelector('.bulk-extreme').value);
+  if (hasUnsavedInput && !confirm('Loading will replace the rows currently in this table. Any unsaved changes here will be lost. Continue?')) {
+    return;
+  }
+
+  const loadBtn = document.getElementById('st-bulk-load-btn');
+  loadBtn.disabled = true;
+  loadBtn.textContent = 'Loading...';
+
+  try {
+    const setups = await getStrategySetups({ startDate: start, endDate: end });
+    if (!setups.length) { showToast('No setups in that range', 'warning'); return; }
+
+    const sorted = [...setups].sort((a, b) =>
+      a.date !== b.date ? a.date.localeCompare(b.date) : (a.trade_time || '').localeCompare(b.trade_time || ''));
+
+    const tbody = document.getElementById('st-bulk-rows');
+    tbody.innerHTML = '';
+    sorted.forEach(s => addBulkRow(s));
+    document.querySelectorAll('#st-bulk-rows tr[data-bulk-row]').forEach(recomputeRowTarget);
+
+    showToast(`Loaded ${setups.length} setup${setups.length !== 1 ? 's' : ''} for editing`, 'success');
+  } catch (err) {
+    showToast('Failed to load setups: ' + err.message, 'error');
+  } finally {
+    loadBtn.disabled = false;
+    loadBtn.textContent = 'Load';
+  }
+}
+
+// `setup` is provided when editing an existing row (loaded via handleLoadBulkSetups);
+// omitted for a fresh blank row from "+ Add Row" / the initial 5 starter rows.
+function buildBulkRowHtml(setup = null) {
+  const pairs = getPairs();
+  if (setup?.pair && !pairs.includes(setup.pair)) pairs.push(setup.pair);
+  const pairOptions = pairs.map(p => `<option value="${p}" ${setup?.pair === p ? 'selected' : ''}>${p}</option>`).join('');
+
+  const direction = setup?.direction || '';
+  const outcome   = setup?.outcome || 'win';
+  const removeTitle = setup ? 'Remove from this batch (does not delete the setup)' : 'Remove row';
+
   return `
-    <tr data-bulk-row>
-      <td><input type="date" class="form-input bulk-date" value="${todayString()}"></td>
-      <td><input type="time" class="form-input bulk-time"></td>
+    <tr data-bulk-row ${setup ? `data-setup-id="${setup.id}"` : ''}>
+      <td><input type="date" class="form-input bulk-date" value="${setup?.date || todayString()}"></td>
+      <td><input type="time" class="form-input bulk-time" value="${setup?.trade_time || ''}"></td>
       <td><select class="form-input bulk-pair">${pairOptions}</select></td>
       <td>
         <select class="form-input bulk-direction">
-          <option value="">--</option>
-          <option value="long">Long</option>
-          <option value="short">Short</option>
+          <option value="" ${direction === '' ? 'selected' : ''}>--</option>
+          <option value="long" ${direction === 'long' ? 'selected' : ''}>Long</option>
+          <option value="short" ${direction === 'short' ? 'selected' : ''}>Short</option>
         </select>
       </td>
-      <td><input type="number" step="0.1" class="form-input bulk-r" placeholder="2.5"></td>
-      <td><input type="number" step="any" class="form-input bulk-entry" placeholder="1.0850"></td>
-      <td><input type="number" step="any" class="form-input bulk-stop" placeholder="1.0820"></td>
-      <td><input type="number" step="any" class="form-input bulk-extreme" placeholder="1.0835"></td>
+      <td><input type="number" step="0.1" class="form-input bulk-r" placeholder="2.5" value="${setup?.possible_r ?? ''}"></td>
+      <td><input type="number" step="any" class="form-input bulk-entry" placeholder="1.0850" value="${setup?.entry_price ?? ''}"></td>
+      <td><input type="number" step="any" class="form-input bulk-stop" placeholder="1.0820" value="${setup?.stop_loss ?? ''}"></td>
+      <td><input type="number" step="any" class="form-input bulk-extreme" placeholder="1.0835" value="${setup?.extreme_price ?? ''}"></td>
       <td><span class="bulk-target td-mono text-muted">—</span></td>
       <td>
         <select class="form-input bulk-outcome">
-          <option value="win" selected>Win</option>
-          <option value="loss">Loss</option>
-          <option value="breakeven">Breakeven</option>
-          <option value="pending">Pending</option>
+          <option value="win" ${outcome === 'win' ? 'selected' : ''}>Win</option>
+          <option value="loss" ${outcome === 'loss' ? 'selected' : ''}>Loss</option>
+          <option value="breakeven" ${outcome === 'breakeven' ? 'selected' : ''}>Breakeven</option>
+          <option value="pending" ${outcome === 'pending' ? 'selected' : ''}>Pending</option>
         </select>
       </td>
-      <td><button type="button" class="btn btn-ghost btn-xs bulk-row-remove" title="Remove row">✕</button></td>
+      <td><button type="button" class="btn btn-ghost btn-xs bulk-row-remove" title="${removeTitle}">✕</button></td>
     </tr>
   `;
 }
 
-function addBulkRow() {
-  document.getElementById('st-bulk-rows').insertAdjacentHTML('beforeend', buildBulkRowHtml());
+function addBulkRow(setup = null) {
+  document.getElementById('st-bulk-rows').insertAdjacentHTML('beforeend', buildBulkRowHtml(setup));
 }
 
 function recomputeRowTarget(row) {
@@ -1818,6 +1867,7 @@ async function handleSaveBulk() {
 
   const toSave = [];
   for (const row of rows) {
+    const setupId = row.dataset.setupId || null;
     const pair    = row.querySelector('.bulk-pair').value;
     const date    = row.querySelector('.bulk-date').value;
     const time    = row.querySelector('.bulk-time').value;
@@ -1826,13 +1876,15 @@ async function handleSaveBulk() {
     const stop    = row.querySelector('.bulk-stop').value;
     const extreme = row.querySelector('.bulk-extreme').value;
 
-    // A row with none of the price/R fields touched is an unused default row — skip it.
-    if (!rVal && !entry && !stop && !extreme) continue;
+    // A blank NEW row (no id, none of the price/R fields touched) is an unused
+    // default row — skip it. A loaded existing row is always saved: it's a
+    // deliberate edit target even if the user cleared every price field.
+    if (!setupId && !rVal && !entry && !stop && !extreme) continue;
 
     if (!pair) { showToast('Every filled-in row needs a pair', 'error'); return; }
     if (!date) { showToast('Every filled-in row needs a date', 'error'); return; }
 
-    toSave.push({
+    const setupData = {
       date,
       trade_time:    time || null,
       pair,
@@ -1842,10 +1894,12 @@ async function handleSaveBulk() {
       entry_price:   parseFloat(entry) || null,
       stop_loss:     parseFloat(stop) || null,
       extreme_price: parseFloat(extreme) || null,
-      notes:         null,
-      screenshots:   [],
-      signals:       [],
-    });
+    };
+    // Existing setup: update in place, leaving notes/screenshots/signals untouched
+    // (they aren't part of this table, so never send them on an edit).
+    if (setupId) setupData.id = setupId;
+
+    toSave.push(setupData);
   }
 
   if (!toSave.length) { showToast('No rows to save', 'warning'); return; }
@@ -1853,11 +1907,11 @@ async function handleSaveBulk() {
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving...';
 
-  let ok = 0, fail = 0;
+  let added = 0, updated = 0, fail = 0;
   for (const setupData of toSave) {
     try {
       await saveStrategySetup(setupData);
-      ok++;
+      if (setupData.id) updated++; else added++;
     } catch (err) {
       fail++;
       console.error('Bulk save row failed:', err, setupData);
@@ -1867,8 +1921,15 @@ async function handleSaveBulk() {
   saveBtn.disabled = false;
   saveBtn.textContent = 'Save All';
 
-  if (ok) showToast(`${ok} setup${ok !== 1 ? 's' : ''} added${fail ? `, ${fail} failed` : ''}`, fail ? 'warning' : 'success');
-  else showToast('Failed to save setups', 'error');
+  const ok = added + updated;
+  if (ok) {
+    const parts = [];
+    if (added)   parts.push(`${added} added`);
+    if (updated) parts.push(`${updated} updated`);
+    showToast(`${parts.join(', ')}${fail ? `, ${fail} failed` : ''}`, fail ? 'warning' : 'success');
+  } else {
+    showToast('Failed to save setups', 'error');
+  }
 
   if (ok) {
     closeBulkModal();

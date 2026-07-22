@@ -546,7 +546,7 @@
       <div class="modal-backdrop" id="st-bulk-modal-backdrop"></div>
       <div class="modal-dialog" style="width:min(1040px,98vw)">
         <div class="modal-header">
-          <h2>Bulk Enter Setups</h2>
+          <h2>Bulk Enter / Edit Setups</h2>
           <button class="modal-close" id="st-bulk-modal-close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -554,8 +554,21 @@
         <div class="modal-body">
           <p class="text-sm text-muted" style="margin-bottom:14px">
             Fill in a row per setup. Target Price is calculated automatically from Entry, Stop Loss and Possible R.
-            Blank rows are skipped. Notes and screenshots aren't part of bulk entry: edit a setup individually to add those.
+            Blank new rows are skipped. Notes and screenshots aren't part of bulk entry: edit a setup individually to add those.
           </p>
+          <div class="form-grid-2" style="margin-bottom:16px;align-items:end">
+            <div class="form-group">
+              <label class="form-label">Load existing setups from</label>
+              <input type="date" id="st-bulk-load-start" class="form-input">
+            </div>
+            <div class="form-group" style="display:flex;gap:8px;align-items:end">
+              <div style="flex:1">
+                <label class="form-label">To</label>
+                <input type="date" id="st-bulk-load-end" class="form-input">
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" id="st-bulk-load-btn">Load</button>
+            </div>
+          </div>
           <div class="table-wrapper">
             <table class="bulk-setup-table">
               <thead>

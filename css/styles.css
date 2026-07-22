@@ -573,6 +573,16 @@ select.form-input option {
   color: var(--profit);
 }
 
+/* Preset/filter toggle buttons (Export range, weekly chart window) had no
+   active-state style at all, so clicking them gave zero visual feedback
+   even though the underlying selection was changing correctly. */
+.st-export-preset.active,
+.st-chart-filter.active {
+  background: var(--primary-dim);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 /* Tilt Meter */
 .tilt-meter { display: flex; flex-direction: column; gap: 6px; }
 
