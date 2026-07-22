@@ -75,28 +75,38 @@ export async function getNewsForRange(startDate, endDate) {
 
 // ---- Internal ----
 
+const PROXY_TIMEOUT_MS = 7000; // bounds worst case per proxy; a dead proxy can't hang the page
+
+// Races every proxy for this path at once instead of trying them one at a
+// time — a single slow/dead proxy no longer blocks the others. First proxy
+// to return a non-empty array wins; only rejects once ALL proxies fail.
 async function fetchFeedPath(path) {
   const target = FF_BASE + path;
-  const errors = [];
 
-  for (const { prefix, parse } of PROXIES) {
+  const attempts = PROXIES.map(({ prefix, parse }) => {
     const label = prefix.replace('https://', '').split('/')[0];
-    try {
-      const r    = await fetch(prefix + encodeURIComponent(target));
-      const text = await r.text();
-      const parsed = parse(text);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
+
+    return fetch(prefix + encodeURIComponent(target), { signal: controller.signal })
+      .then(r => r.text())
+      .then(text => {
+        const parsed = parse(text);
+        if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('empty response');
         console.log(`[News] ${path} OK via ${label} (${parsed.length} events)`);
         return parsed;
-      }
-      errors.push(`${label}: empty response`);
-    } catch (e) {
-      errors.push(`${label}: ${e.message.slice(0, 60)}`);
-    }
-  }
+      })
+      .catch(e => { throw new Error(`${label}: ${e.message.slice(0, 60)}`); })
+      .finally(() => clearTimeout(timer));
+  });
 
-  console.warn('[News] All proxies failed for', path, errors);
-  throw new Error(`${path.replace('/ff_calendar_','').replace('.json','')} feed unavailable (${errors[0]})`);
+  try {
+    return await Promise.any(attempts);
+  } catch (aggErr) {
+    const errors = (aggErr.errors || []).map(e => e.message);
+    console.warn('[News] All proxies failed for', path, errors);
+    throw new Error(`${path.replace('/ff_calendar_','').replace('.json','')} feed unavailable (${errors[0] || 'no proxies responded'})`);
+  }
 }
 
 async function fetchAll() {

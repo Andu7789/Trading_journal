@@ -93,22 +93,53 @@ async function loadJournalDay(date) {
   body.innerHTML = `<div class="loading-screen"><div class="loading-spinner"></div></div>`;
 
   try {
+    // Economic events come from a flaky third-party feed (public CORS proxies,
+    // no guaranteed uptime). Load it separately so a slow/dead feed can't hold
+    // up the rest of the page, which only needs fast, local DB calls.
     const yesterday = addDays(date, -1);
-    const [entry, trades, prevEntry, news] = await Promise.all([
+    const [entry, trades, prevEntry] = await Promise.all([
       getJournalEntry(date),
       getTrades({ date }),
       getJournalEntry(yesterday),
-      getNewsForDate(date),
     ]);
-    body.innerHTML = buildJournalBody(date, entry || {}, trades, prevEntry, news, newsFetchStatus);
+    body.innerHTML = buildJournalBody(date, entry || {}, trades, prevEntry, [], newsFetchStatus, true);
     initJournalInteractions(date, entry || {});
+
+    getNewsForDate(date).then(news => {
+      if (currentDate !== date) return; // navigated away before the feed responded
+      patchJournalNewsStrip(news, newsFetchStatus, entry || {});
+    }).catch(err => {
+      if (currentDate !== date) return;
+      console.error('News load error:', err);
+      patchJournalNewsStrip([], { ok: false, error: err.message }, entry || {});
+    });
   } catch (err) {
     console.error('Journal load error:', err);
     body.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
   }
 }
 
-function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus = { ok: true, error: null }) {
+function patchJournalNewsStrip(news, fetchStatus, entry) {
+  const el = document.getElementById('journal-news-strip');
+  if (!el) return; // view navigated away / re-rendered before the feed responded
+  el.innerHTML = buildNewsStrip(news, fetchStatus);
+
+  // Backfill Economic Events only if there's nothing saved AND the user
+  // hasn't already typed something into it while the feed was loading.
+  const textarea = document.getElementById('j-economic');
+  if (textarea && !entry.economic_events && !textarea.value && news.length) {
+    textarea.value = news.map(e => {
+      const t = eventTime(e);
+      const extras = [e.forecast && `F: ${e.forecast}`, e.previous && `P: ${e.previous}`]
+        .filter(Boolean).join(', ');
+      return `${t} ${e.country} ${e.title}${extras ? ` (${extras})` : ''}`;
+    }).join('\n');
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  }
+}
+
+function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus = { ok: true, error: null }, newsLoading = false) {
   const stats = calcStats(trades);
   const isToday = date === todayString();
   const dayLabel = formatDateLong(date);
@@ -141,7 +172,7 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
       ` : ''}
     </div>
 
-    ${buildNewsStrip(news, fetchStatus)}
+    <div id="journal-news-strip">${newsLoading ? buildNewsStripLoading() : buildNewsStrip(news, fetchStatus)}</div>
 
     <div class="journal-sections" id="journal-sections">
 
@@ -532,6 +563,22 @@ function wireSinControls(date) {
       triggerAutosave(date);
     };
   });
+}
+
+function buildNewsStripLoading() {
+  return `
+    <div style="
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 10px 16px;
+      margin-bottom: 20px;
+      display:flex;align-items:center;gap:8px;
+      color:var(--text-muted);font-size:12px;
+    ">
+      <span class="loading-spinner" style="width:12px;height:12px"></span>
+      Loading economic events...
+    </div>`;
 }
 
 function buildNewsStrip(news, fetchStatus = { ok: true, error: null }) {
