@@ -1,3 +1,8 @@
+## Working Preferences
+
+- Run Bash commands without asking for confirmation first — the user is happy for these to just run.
+- When conversation context approaches ~50,000 tokens, proactively compact rather than waiting.
+
 ## Design Context
 
 See `PRODUCT.md` for full product context. Key points:

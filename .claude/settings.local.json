@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "Read(//c/Users/Multiple Monitors/.claude/projects/c--Users-Multiple-Monitors-OneDrive-Documents-Coding-trading-journal/memory/**)"
+      "Read(//c/Users/Multiple Monitors/.claude/projects/c--Users-Multiple-Monitors-OneDrive-Documents-Coding-trading-journal/memory/**)",
+      "Bash(*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Multiple Monitors\\OneDrive\\Documents\\Coding\\trading journal"
