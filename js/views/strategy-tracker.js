@@ -1735,23 +1735,23 @@ function buildBulkRowHtml() {
   const pairOptions = getPairs().map(p => `<option value="${p}">${p}</option>`).join('');
   return `
     <tr data-bulk-row>
-      <td><input type="date" class="form-input bulk-date" value="${todayString()}" style="min-width:126px"></td>
-      <td><input type="time" class="form-input bulk-time" style="min-width:86px"></td>
-      <td><select class="form-input bulk-pair" style="min-width:100px">${pairOptions}</select></td>
+      <td><input type="date" class="form-input bulk-date" value="${todayString()}"></td>
+      <td><input type="time" class="form-input bulk-time"></td>
+      <td><select class="form-input bulk-pair">${pairOptions}</select></td>
       <td>
-        <select class="form-input bulk-direction" style="min-width:86px">
+        <select class="form-input bulk-direction">
           <option value="">--</option>
           <option value="long">Long</option>
           <option value="short">Short</option>
         </select>
       </td>
-      <td><input type="number" step="0.1" class="form-input bulk-r" placeholder="2.5" style="min-width:80px"></td>
-      <td><input type="number" step="any" class="form-input bulk-entry" placeholder="1.0850" style="min-width:100px"></td>
-      <td><input type="number" step="any" class="form-input bulk-stop" placeholder="1.0820" style="min-width:100px"></td>
-      <td><input type="number" step="any" class="form-input bulk-extreme" placeholder="1.0835" style="min-width:100px"></td>
+      <td><input type="number" step="0.1" class="form-input bulk-r" placeholder="2.5"></td>
+      <td><input type="number" step="any" class="form-input bulk-entry" placeholder="1.0850"></td>
+      <td><input type="number" step="any" class="form-input bulk-stop" placeholder="1.0820"></td>
+      <td><input type="number" step="any" class="form-input bulk-extreme" placeholder="1.0835"></td>
       <td><span class="bulk-target td-mono text-muted">—</span></td>
       <td>
-        <select class="form-input bulk-outcome" style="min-width:100px">
+        <select class="form-input bulk-outcome">
           <option value="win" selected>Win</option>
           <option value="loss">Loss</option>
           <option value="breakeven">Breakeven</option>

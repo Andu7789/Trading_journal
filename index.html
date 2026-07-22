@@ -544,7 +544,7 @@
     <!-- ===== BULK ENTER SETUPS MODAL ===== -->
     <div id="st-bulk-modal" class="modal hidden">
       <div class="modal-backdrop" id="st-bulk-modal-backdrop"></div>
-      <div class="modal-dialog" style="width:min(1160px,96vw)">
+      <div class="modal-dialog" style="width:min(1040px,98vw)">
         <div class="modal-header">
           <h2>Bulk Enter Setups</h2>
           <button class="modal-close" id="st-bulk-modal-close">
@@ -557,20 +557,20 @@
             Blank rows are skipped. Notes and screenshots aren't part of bulk entry: edit a setup individually to add those.
           </p>
           <div class="table-wrapper">
-            <table>
+            <table class="bulk-setup-table">
               <thead>
                 <tr>
-                  <th style="min-width:130px">Date</th>
-                  <th style="min-width:90px">Time</th>
-                  <th style="min-width:110px">Pair</th>
-                  <th style="min-width:90px">Direction</th>
-                  <th style="min-width:90px">Possible R</th>
-                  <th style="min-width:110px">Entry Price</th>
-                  <th style="min-width:110px">Stop Loss</th>
-                  <th style="min-width:110px">Extreme Price</th>
-                  <th style="min-width:110px">Target Price</th>
-                  <th style="min-width:110px">Outcome</th>
-                  <th style="width:36px"></th>
+                  <th style="min-width:108px">Date</th>
+                  <th style="min-width:76px">Time</th>
+                  <th style="min-width:86px">Pair</th>
+                  <th style="min-width:70px">Dir</th>
+                  <th style="min-width:64px">R</th>
+                  <th style="min-width:80px">Entry</th>
+                  <th style="min-width:80px">Stop</th>
+                  <th style="min-width:80px">Extreme</th>
+                  <th style="min-width:80px">Target</th>
+                  <th style="min-width:82px">Outcome</th>
+                  <th style="width:26px"></th>
                 </tr>
               </thead>
               <tbody id="st-bulk-rows"></tbody>

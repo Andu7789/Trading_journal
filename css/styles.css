@@ -1077,6 +1077,21 @@ tbody td {
 
 .td-mono { font-family: var(--font-mono); font-size: 12px; }
 
+/* Dense data-entry table (Strategy Tracker bulk enter): many narrow columns,
+   so cell padding is the main space cost — trim it well below the default
+   table padding to avoid horizontal scroll on ordinary window widths. */
+.bulk-setup-table th,
+.bulk-setup-table td {
+  padding: 6px 8px;
+}
+.bulk-setup-table td .form-input {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.bulk-setup-table .bulk-target {
+  display: inline-block;
+}
+
 .trade-detail-cell {
   background: var(--bg-surface);
   padding: 16px 20px;
