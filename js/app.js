@@ -35,7 +35,7 @@ function updateTradeSignalScore() {
   const allBtn = document.getElementById('trade-signal-all');
   if (allBtn) allBtn.classList.toggle('active', count === btns.length);
   const el = document.getElementById('trade-signal-score');
-  if (el) el.textContent = `Score: ${count} / 4`;
+  if (el) el.textContent = `Score: ${count} / ${btns.length}`;
 }
 
 // ---- Image carousel state ----

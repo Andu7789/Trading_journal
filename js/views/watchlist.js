@@ -241,7 +241,7 @@ function _updateSignalScore() {
   const allBtn = document.getElementById('wl-signal-all');
   if (allBtn) allBtn.classList.toggle('active', count === btns.length);
   const el = document.getElementById('wl-signal-score');
-  if (el) el.textContent = `Score: ${count} / 4`;
+  if (el) el.textContent = `Score: ${count} / ${btns.length}`;
 }
 
 // =============================================

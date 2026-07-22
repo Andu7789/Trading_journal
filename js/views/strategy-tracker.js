@@ -30,7 +30,7 @@ function _updateStSignalScore() {
   const allBtn = document.getElementById('st-signal-all');
   if (allBtn) allBtn.classList.toggle('active', count === btns.length);
   const el = document.getElementById('st-signal-score');
-  if (el) el.textContent = `Score: ${count} / 4`;
+  if (el) el.textContent = `Score: ${count} / ${btns.length}`;
 }
 
 function getPairs() {
@@ -902,9 +902,9 @@ function _drawPairChart(setups) {
 // =============================================
 //  CONFLUENCE ANALYSIS
 // =============================================
-const ST_SIGNALS     = ['Dollar', 'DXY', 'EURUSD', 'GBPUSD'];
-const ST_SIG_LABELS  = { Dollar: 'Dollar', DXY: 'DXY', EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD' };
-const ST_SIG_SHORT   = { Dollar: 'DLR', DXY: 'DXY', EURUSD: 'EUR', GBPUSD: 'GBP' };
+const ST_SIGNALS     = ['Dollar', 'EURUSD', 'GBPUSD'];
+const ST_SIG_LABELS  = { Dollar: 'Dollar', EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD' };
+const ST_SIG_SHORT   = { Dollar: 'DLR', EURUSD: 'EUR', GBPUSD: 'GBP' };
 let _stConfByCombination = {};
 let _stConfCombos        = [];
 let _dayModalSetups      = [];

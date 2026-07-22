@@ -4,7 +4,7 @@
 import { getTrades, deleteTrade, getClient } from '../db.js';
 import { calcStats, formatCurrency, formatDate, pnlClass, pnlSign,
          getOutcomeBadge, getDirectionBadge, getEmotionChip,
-         todayString, getWeekRange, addDays, nl2br, getSignalDisplay, SIGNAL_LABELS,
+         todayString, getWeekRange, addDays, nl2br, getSignalDisplay, SIGNAL_LABELS, SIGNAL_INSTRUMENTS,
          calcTradeR, formatR } from '../utils.js';
 import { openTradeModal, showToast } from '../app.js';
 
@@ -302,9 +302,9 @@ function buildTradeRow(t) {
       <td colspan="13" class="trade-detail-cell">
         ${signals.length ? `
           <div style="margin-bottom:12px">
-            <div class="text-xs text-muted mb-8">Signal Confluence (${signals.length}/4)</div>
+            <div class="text-xs text-muted mb-8">Signal Confluence (${signals.length}/${SIGNAL_INSTRUMENTS.length})</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              ${['Dollar','DXY','EURUSD','GBPUSD'].map(inst => `
+              ${SIGNAL_INSTRUMENTS.map(inst => `
                 <span style="padding:4px 10px;border-radius:var(--radius);font-size:11px;font-weight:600;
                   background:${signals.includes(inst) ? 'rgba(0,217,126,0.15)' : 'var(--bg-elevated)'};
                   color:${signals.includes(inst) ? 'var(--profit)' : 'var(--text-muted)'};

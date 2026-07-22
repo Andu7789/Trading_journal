@@ -214,7 +214,7 @@ function buildAnalyticsLayout(trades) {
       <div class="card-header">
         <div>
           <div class="card-title">Signal Confluence Analysis</div>
-          <div class="card-subtitle">Trade performance by number of confirmed swing-point signals (0–4)</div>
+          <div class="card-subtitle">Trade performance by number of confirmed swing-point signals (0-${SIGNAL_INSTRUMENTS.length})</div>
         </div>
       </div>
       <div id="confluence-content">
@@ -784,25 +784,30 @@ function renderConfluence(trades) {
   const tableEl = document.getElementById('confluence-table');
   if (!canvas) return;
 
-  // Group by signal score (0-4)
-  const byScore = { 0: [], 1: [], 2: [], 3: [], 4: [] };
+  // Group by signal score (0 to the number of tracked instruments)
+  const maxScore = SIGNAL_INSTRUMENTS.length;
+  const scores   = Array.from({ length: maxScore + 1 }, (_, i) => i);
+  const byScore  = Object.fromEntries(scores.map(s => [s, []]));
   trades.forEach(t => {
     const score = Array.isArray(t.signals) ? t.signals.length : 0;
     if (score in byScore) byScore[score].push(t);
   });
 
-  const labels    = ['0 / 4', '1 / 4', '2 / 4', '3 / 4', '4 / 4'];
-  const counts    = [0,1,2,3,4].map(s => byScore[s].length);
-  const winRates  = [0,1,2,3,4].map(s => {
+  const labels    = scores.map(s => `${s} / ${maxScore}`);
+  const counts    = scores.map(s => byScore[s].length);
+  const winRates  = scores.map(s => {
     const ts = byScore[s];
     return ts.length ? parseFloat((ts.filter(t => t.outcome === 'win').length / ts.length * 100).toFixed(1)) : null;
   });
-  const avgPnls   = [0,1,2,3,4].map(s => {
+  const avgPnls   = scores.map(s => {
     const ts = byScore[s];
     return ts.length ? parseFloat((sum(ts, 'pnl') / ts.length).toFixed(2)) : null;
   });
 
-  const barColors = ['rgba(255,71,87,0.6)', 'rgba(255,140,0,0.6)', 'rgba(255,165,2,0.6)', 'rgba(76,217,100,0.6)', 'rgba(0,230,118,0.7)'];
+  // Full red-to-green ramp for 0..maxScore; middle stops are shared/interpolated
+  // when maxScore shrinks so the ends always read as "worst" / "best".
+  const rampStops = ['rgba(255,71,87,0.6)', 'rgba(255,140,0,0.6)', 'rgba(255,165,2,0.6)', 'rgba(76,217,100,0.6)', 'rgba(0,230,118,0.7)'];
+  const barColors = scores.map(s => rampStops[Math.round((s / maxScore) * (rampStops.length - 1))]);
 
   charts.confluence = new Chart(canvas, {
     type: 'bar',
@@ -843,12 +848,12 @@ function renderConfluence(trades) {
           <table class="table-wrapper" style="width:100%">
             <thead><tr><th>Score</th><th>Trades</th><th>Win %</th><th>Avg P&L</th><th>Total P&L</th></tr></thead>
             <tbody>
-              ${[0,1,2,3,4].filter(s => byScore[s].length).map(s => {
+              ${scores.filter(s => byScore[s].length).map(s => {
                 const ts = byScore[s]; const wins = ts.filter(t => t.outcome === 'win').length;
                 const totalPnl = sum(ts, 'pnl');
-                const scoreColor = s === 4 ? '#00e676' : s === 3 ? '#4cd964' : s === 2 ? '#ffa502' : s === 1 ? '#ff8c00' : 'var(--text-muted)';
+                const scoreColor = s === maxScore ? '#00e676' : s === maxScore - 1 ? '#4cd964' : s === 1 ? '#ffa502' : 'var(--text-muted)';
                 return `<tr>
-                  <td><span style="font-weight:700;color:${scoreColor}">${s}/4</span></td>
+                  <td><span style="font-weight:700;color:${scoreColor}">${s}/${maxScore}</span></td>
                   <td>${ts.length}</td>
                   <td>${ts.length ? (wins/ts.length*100).toFixed(0)+'%' : '—'}</td>
                   <td class="${parseFloat(sum(ts,'pnl')/ts.length) >= 0 ? 'text-profit' : 'text-loss'}">${formatCurrency(sum(ts,'pnl')/ts.length)}</td>
