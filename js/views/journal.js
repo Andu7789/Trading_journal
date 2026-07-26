@@ -17,6 +17,7 @@ let currentSins = [];
 let currentPlanImages = [null, null, null];
 let currentSessionLog = [];
 let pendingLogImages = [];
+let editingLogEntryId = null;
 
 const DEFAULT_SINS = [
   'Exited too soon',
@@ -147,6 +148,7 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
   currentPlanImages = normalizePlanImages(entry.plan_images);
   currentSessionLog = normalizeSessionLog(entry.session_log);
   pendingLogImages = [];
+  editingLogEntryId = null;
 
   // Auto-fill Economic Events textarea when entry has no saved value
   const autoEconomicEvents = !entry.economic_events && news.length
@@ -258,7 +260,8 @@ function buildJournalBody(date, entry, trades, prevEntry, news = [], fetchStatus
               </div>
               <div id="log-pending-images">${buildLogPendingImages()}</div>
             </div>
-            <div style="display:flex;justify-content:flex-end">
+            <div style="display:flex;justify-content:flex-end;gap:8px">
+              <button type="button" class="btn btn-ghost btn-sm" id="cancel-log-edit-btn" style="display:none">Cancel</button>
               <button type="button" class="btn btn-primary btn-sm" id="add-log-entry-btn">+ Add Entry</button>
             </div>
           </div>
@@ -432,11 +435,14 @@ function buildSessionLogList() {
   return `
     <div class="session-log-rows">
       ${currentSessionLog.map((entry, idx) => `
-        <div class="session-log-row">
+        <div class="session-log-row ${entry.id === editingLogEntryId ? 'editing' : ''}">
           <div class="session-log-row-header">
             <span class="session-log-time">${escapeHtml(entry.time)}</span>
             ${entry.tag ? `<span class="badge badge-open">${escapeHtml(entry.tag)}</span>` : ''}
-            <button type="button" class="btn btn-ghost btn-xs session-log-delete" data-index="${idx}">Delete</button>
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <button type="button" class="btn btn-ghost btn-xs session-log-edit" data-index="${idx}">Edit</button>
+              <button type="button" class="btn btn-ghost btn-xs session-log-delete" data-index="${idx}">Delete</button>
+            </div>
           </div>
           ${entry.comment ? `<div class="session-log-comment">${nl2br(entry.comment)}</div>` : ''}
           ${entry.images.length ? `
@@ -481,14 +487,55 @@ function renderSessionLog(date) {
 }
 
 function wireSessionLogControls(date) {
+  document.querySelectorAll('.session-log-edit').forEach(btn => {
+    btn.onclick = () => startEditLogEntry(parseInt(btn.dataset.index), date);
+  });
   document.querySelectorAll('.session-log-delete').forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.index);
+      const removed = currentSessionLog[idx];
       currentSessionLog.splice(idx, 1);
-      renderSessionLog(date);
+      if (removed && removed.id === editingLogEntryId) {
+        cancelLogEdit(date);
+      } else {
+        renderSessionLog(date);
+      }
       triggerAutosave(date);
     };
   });
+}
+
+function startEditLogEntry(idx, date) {
+  const entry = currentSessionLog[idx];
+  if (!entry) return;
+  editingLogEntryId = entry.id;
+  document.getElementById('new-log-tag').value = entry.tag || '';
+  document.getElementById('new-log-comment').value = entry.comment || '';
+  pendingLogImages = entry.images.map(url => ({ file: null, url, localUrl: url, uploaded: true }));
+  const pendingContainer = document.getElementById('log-pending-images');
+  if (pendingContainer) pendingContainer.innerHTML = buildLogPendingImages();
+  const addBtn = document.getElementById('add-log-entry-btn');
+  if (addBtn) addBtn.textContent = 'Save Changes';
+  const cancelBtn = document.getElementById('cancel-log-edit-btn');
+  if (cancelBtn) cancelBtn.style.display = '';
+  renderSessionLog(date);
+  document.querySelector('.session-log-add')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelLogEdit(date) {
+  editingLogEntryId = null;
+  pendingLogImages = [];
+  const tagInput = document.getElementById('new-log-tag');
+  const textarea = document.getElementById('new-log-comment');
+  if (tagInput) tagInput.value = '';
+  if (textarea) textarea.value = '';
+  const pendingContainer = document.getElementById('log-pending-images');
+  if (pendingContainer) pendingContainer.innerHTML = '';
+  const addBtn = document.getElementById('add-log-entry-btn');
+  if (addBtn) addBtn.textContent = '+ Add Entry';
+  const cancelBtn = document.getElementById('cancel-log-edit-btn');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  renderSessionLog(date);
 }
 
 function normalizeSins(sins) {
@@ -882,6 +929,7 @@ function initJournalInteractions(date) {
       btn.textContent = originalText;
     }
   };
+  document.getElementById('cancel-log-edit-btn').onclick = () => cancelLogEdit(date);
   document.getElementById('add-log-entry-btn').onclick = async () => {
     const textarea = document.getElementById('new-log-comment');
     const tagInput = document.getElementById('new-log-tag');
@@ -891,21 +939,33 @@ function initJournalInteractions(date) {
       showToast('Add a comment or an image first', 'warning');
       return;
     }
+    const isEditing = !!editingLogEntryId;
     const btn = document.getElementById('add-log-entry-btn');
     btn.disabled = true;
-    btn.textContent = 'Adding...';
+    btn.textContent = isEditing ? 'Saving...' : 'Adding...';
     try {
       const images = [];
       for (const item of pendingLogImages) {
         images.push(item.uploaded ? item.url : await uploadScreenshot(item.file));
       }
-      currentSessionLog.push({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        comment,
-        images,
-        tag,
-      });
+      if (isEditing) {
+        const entry = currentSessionLog.find(e => e.id === editingLogEntryId);
+        if (entry) {
+          entry.comment = comment;
+          entry.tag = tag;
+          entry.images = images;
+        }
+        editingLogEntryId = null;
+        document.getElementById('cancel-log-edit-btn').style.display = 'none';
+      } else {
+        currentSessionLog.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          comment,
+          images,
+          tag,
+        });
+      }
       pendingLogImages = [];
       textarea.value = '';
       if (tagInput) tagInput.value = '';
@@ -913,9 +973,9 @@ function initJournalInteractions(date) {
       if (pendingContainer) pendingContainer.innerHTML = buildLogPendingImages();
       renderSessionLog(date);
       await saveJournal(date, false);
-      showToast('Entry added', 'success');
+      showToast(isEditing ? 'Entry updated' : 'Entry added', 'success');
     } catch (err) {
-      showToast('Failed to add entry: ' + err.message, 'error');
+      showToast(`Failed to ${isEditing ? 'update' : 'add'} entry: ` + err.message, 'error');
     } finally {
       btn.disabled = false;
       btn.textContent = '+ Add Entry';

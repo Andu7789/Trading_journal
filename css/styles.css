@@ -865,8 +865,13 @@ select.form-input option {
 .session-log-row-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 6px;
+}
+
+.session-log-row.editing {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .session-log-time {
