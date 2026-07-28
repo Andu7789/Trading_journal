@@ -495,9 +495,10 @@ function buildTaggedNotes(journal) {
     <div style="margin-bottom:16px;display:flex;flex-direction:column;gap:12px">
       ${entries.map(entry => {
         const images = Array.isArray(entry.images) ? entry.images.filter(Boolean) : [];
+        const isMistake = entry.tag.toLowerCase().includes('mistake');
         return `
         <div class="weekly-tagged-note">
-          <div class="weekly-tagged-note-header">${escapeHtml(entry.tag)}</div>
+          <div class="weekly-tagged-note-header ${isMistake ? 'mistake' : ''}">${escapeHtml(entry.tag)}</div>
           ${entry.comment ? `<div class="session-log-comment">${nl2br(entry.comment)}</div>` : ''}
           ${images.length ? `
           <div class="log-images-grid" style="grid-template-columns:repeat(${imageGridColumns(images.length)}, 1fr)">

@@ -2063,6 +2063,8 @@ tbody td {
   border-bottom: 1px solid var(--border);
 }
 
+.weekly-tagged-note-header.mistake { color: var(--loss); }
+
 .weekly-sins-total {
   display: flex;
   flex-direction: column;
