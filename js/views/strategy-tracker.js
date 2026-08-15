@@ -906,14 +906,14 @@ function _drawPairChart(setups) {
 // =============================================
 //  TRADING WINDOW BREAKDOWN (awake/tradeable vs asleep/away)
 // =============================================
-// Awake/tradeable window: 10:00-18:00. Everything else (18:00-10:00, wrapping
+// Awake/tradeable window: 06:00-18:00. Everything else (18:00-06:00, wrapping
 // past midnight) is the asleep/away window.
 function _sessionWindowFor(timeStr) {
   if (!timeStr) return null;
   const [h, m] = timeStr.split(':').map(Number);
   if (isNaN(h) || isNaN(m)) return null;
   const mins = h * 60 + m;
-  return (mins >= 10 * 60 && mins < 18 * 60) ? 'awake' : 'asleep';
+  return (mins >= 6 * 60 && mins < 18 * 60) ? 'awake' : 'asleep';
 }
 
 function renderSessionBreakdown(allSetups) {
@@ -948,17 +948,17 @@ function renderSessionBreakdown(allSetups) {
     <div class="card" style="padding:20px">
       <div class="card-title" style="font-size:14px;margin-bottom:4px">R by Trading Window</div>
       <div class="card-subtitle" style="margin-bottom:16px">
-        Setups while you can actually trade (10:00–18:00) vs while asleep/away (18:00–10:00)${untimed ? ` · ${untimed} setup${untimed !== 1 ? 's' : ''} without a recorded time excluded` : ''}
+        Setups while you can actually trade (06:00–18:00) vs while asleep/away (18:00–06:00)${untimed ? ` · ${untimed} setup${untimed !== 1 ? 's' : ''} without a recorded time excluded` : ''}
       </div>
       <div class="stats-grid" style="margin-bottom:16px">
-        ${statCard('Awake / Tradeable (10:00–18:00)', buckets.awake)}
-        ${statCard('Asleep / Away (18:00–10:00)', buckets.asleep)}
+        ${statCard('Awake / Tradeable (06:00–18:00)', buckets.awake)}
+        ${statCard('Asleep / Away (18:00–06:00)', buckets.asleep)}
       </div>
       <div style="position:relative;height:180px"><canvas id="st-session-chart"></canvas></div>
     </div>
   `;
 
-  const labels = ['Awake (10:00–18:00)', 'Asleep (18:00–10:00)'];
+  const labels = ['Awake (06:00–18:00)', 'Asleep (18:00–06:00)'];
   _barChart('st-session-chart', labels,
     [buckets.awake, buckets.asleep].map(_calcR),
     [buckets.awake, buckets.asleep].map(_winRate));
