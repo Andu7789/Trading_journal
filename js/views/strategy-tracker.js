@@ -130,6 +130,9 @@ function buildShell() {
     <!-- Breakdown charts -->
     <div id="st-breakdown-charts" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px"></div>
 
+    <!-- Trading Window breakdown (awake/tradeable vs asleep/away) -->
+    <div id="st-session-breakdown" style="margin-bottom:20px"></div>
+
     <!-- Confluence Analysis -->
     <div id="st-confluence-section" style="margin-bottom:20px"></div>
     <div id="st-confluence-drilldown" style="display:none;margin-bottom:20px"></div>
@@ -198,6 +201,7 @@ async function loadAllTimeAndChart() {
     // Each renderer is isolated so a chart error doesn't wipe out the stats above
     try { renderChartSection(allSetups); } catch (e) { if (chartEl) chartEl.innerHTML = `<p class="text-loss text-sm" style="padding:20px">${e.message}</p>`; }
     try { renderBreakdownCharts(allSetups); } catch (e) { console.error('Breakdown charts:', e); }
+    try { renderSessionBreakdown(allSetups); } catch (e) { console.error('Session breakdown:', e); }
     try { renderStConfluence(allSetups); } catch (e) { console.error('Confluence:', e); }
     try { renderStopEfficiency(allSetups); } catch (e) { console.error('Stop efficiency:', e); }
   } catch (err) {
@@ -897,6 +901,67 @@ function _drawPairChart(setups) {
 
   const pairs = Object.keys(byPair).sort((a, b) => _calcR(byPair[b]) - _calcR(byPair[a]));
   _barChart('st-pair-chart', pairs, pairs.map(p => _calcR(byPair[p])), pairs.map(p => _winRate(byPair[p])));
+}
+
+// =============================================
+//  TRADING WINDOW BREAKDOWN (awake/tradeable vs asleep/away)
+// =============================================
+// Awake/tradeable window: 10:00-18:00. Everything else (18:00-10:00, wrapping
+// past midnight) is the asleep/away window.
+function _sessionWindowFor(timeStr) {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(':').map(Number);
+  if (isNaN(h) || isNaN(m)) return null;
+  const mins = h * 60 + m;
+  return (mins >= 10 * 60 && mins < 18 * 60) ? 'awake' : 'asleep';
+}
+
+function renderSessionBreakdown(allSetups) {
+  const el = document.getElementById('st-session-breakdown');
+  if (!el) return;
+
+  const closed = allSetups.filter(s => s.outcome === 'win' || s.outcome === 'loss' || s.outcome === 'breakeven');
+  const timed  = closed.filter(s => _sessionWindowFor(s.trade_time) !== null);
+  if (!timed.length) { el.innerHTML = ''; return; }
+
+  const buckets = {
+    awake:  timed.filter(s => _sessionWindowFor(s.trade_time) === 'awake'),
+    asleep: timed.filter(s => _sessionWindowFor(s.trade_time) === 'asleep'),
+  };
+  const untimed = closed.length - timed.length;
+
+  const statCard = (label, setups) => {
+    const totalR = _calcR(setups);
+    const wins   = setups.filter(s => s.outcome === 'win').length;
+    const losses = setups.filter(s => s.outcome === 'loss').length;
+    const wr     = _winRate(setups);
+    const rColor = totalR >= 0 ? 'profit' : 'loss';
+    return `
+      <div class="stat-card ${setups.length ? rColor : ''}">
+        <div class="stat-label">${label}</div>
+        <div class="stat-value ${setups.length ? rColor : 'neutral'}">${setups.length ? (totalR >= 0 ? '+' : '') + totalR.toFixed(2) + 'R' : '—'}</div>
+        <div class="stat-sub">${setups.length} setup${setups.length !== 1 ? 's' : ''} · ${wins}W / ${losses}L · ${wr}% WR</div>
+      </div>`;
+  };
+
+  el.innerHTML = `
+    <div class="card" style="padding:20px">
+      <div class="card-title" style="font-size:14px;margin-bottom:4px">R by Trading Window</div>
+      <div class="card-subtitle" style="margin-bottom:16px">
+        Setups while you can actually trade (10:00–18:00) vs while asleep/away (18:00–10:00)${untimed ? ` · ${untimed} setup${untimed !== 1 ? 's' : ''} without a recorded time excluded` : ''}
+      </div>
+      <div class="stats-grid" style="margin-bottom:16px">
+        ${statCard('Awake / Tradeable (10:00–18:00)', buckets.awake)}
+        ${statCard('Asleep / Away (18:00–10:00)', buckets.asleep)}
+      </div>
+      <div style="position:relative;height:180px"><canvas id="st-session-chart"></canvas></div>
+    </div>
+  `;
+
+  const labels = ['Awake (10:00–18:00)', 'Asleep (18:00–10:00)'];
+  _barChart('st-session-chart', labels,
+    [buckets.awake, buckets.asleep].map(_calcR),
+    [buckets.awake, buckets.asleep].map(_winRate));
 }
 
 // =============================================
