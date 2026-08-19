@@ -201,7 +201,7 @@ async function loadAllTimeAndChart() {
     // Each renderer is isolated so a chart error doesn't wipe out the stats above
     try { renderChartSection(allSetups); } catch (e) { if (chartEl) chartEl.innerHTML = `<p class="text-loss text-sm" style="padding:20px">${e.message}</p>`; }
     try { renderBreakdownCharts(allSetups); } catch (e) { console.error('Breakdown charts:', e); }
-    try { renderSessionBreakdown(allSetups); } catch (e) { console.error('Session breakdown:', e); }
+    try { renderSessionBreakdown('st-session-breakdown', 'st-session-chart', allSetups); } catch (e) { console.error('Session breakdown:', e); }
     try { renderStConfluence(allSetups); } catch (e) { console.error('Confluence:', e); }
     try { renderStopEfficiency(allSetups); } catch (e) { console.error('Stop efficiency:', e); }
   } catch (err) {
@@ -916,8 +916,8 @@ function _sessionWindowFor(timeStr) {
   return (mins >= 6 * 60 && mins < 18 * 60) ? 'awake' : 'asleep';
 }
 
-function renderSessionBreakdown(allSetups) {
-  const el = document.getElementById('st-session-breakdown');
+function renderSessionBreakdown(containerId, canvasId, allSetups, title = 'R by Trading Window') {
+  const el = document.getElementById(containerId);
   if (!el) return;
 
   const closed = allSetups.filter(s => s.outcome === 'win' || s.outcome === 'loss' || s.outcome === 'breakeven');
@@ -946,7 +946,7 @@ function renderSessionBreakdown(allSetups) {
 
   el.innerHTML = `
     <div class="card" style="padding:20px">
-      <div class="card-title" style="font-size:14px;margin-bottom:4px">R by Trading Window</div>
+      <div class="card-title" style="font-size:14px;margin-bottom:4px">${title}</div>
       <div class="card-subtitle" style="margin-bottom:16px">
         Setups while you can actually trade (06:00–18:00) vs while asleep/away (18:00–06:00)${untimed ? ` · ${untimed} setup${untimed !== 1 ? 's' : ''} without a recorded time excluded` : ''}
       </div>
@@ -954,12 +954,12 @@ function renderSessionBreakdown(allSetups) {
         ${statCard('Awake / Tradeable (06:00–18:00)', buckets.awake)}
         ${statCard('Asleep / Away (18:00–06:00)', buckets.asleep)}
       </div>
-      <div style="position:relative;height:180px"><canvas id="st-session-chart"></canvas></div>
+      <div style="position:relative;height:180px"><canvas id="${canvasId}"></canvas></div>
     </div>
   `;
 
   const labels = ['Awake (06:00–18:00)', 'Asleep (18:00–06:00)'];
-  _barChart('st-session-chart', labels,
+  _barChart(canvasId, labels,
     [buckets.awake, buckets.asleep].map(_calcR),
     [buckets.awake, buckets.asleep].map(_winRate));
 }
@@ -1277,6 +1277,9 @@ async function loadWeek() {
     const setups = await getStrategySetups({ startDate: currentWeekStart, endDate: weekEnd });
     contentEl.innerHTML = buildWeekContent(setups);
     wireWeekContent(setups);
+    try {
+      renderSessionBreakdown('st-week-session-breakdown', 'st-week-session-chart', setups, 'R by Trading Window — This Week');
+    } catch (e) { console.error('Week session breakdown:', e); }
   } catch (err) {
     contentEl.innerHTML = `<div class="empty-state"><p class="text-loss">Error: ${err.message}</p></div>`;
   }
@@ -1315,6 +1318,9 @@ function buildWeekContent(setups) {
         <p>Click "Add Setup" to record a strategy setup</p>
       </div>
     `}
+
+    <!-- Trading window breakdown (this week) -->
+    <div id="st-week-session-breakdown" style="margin-top:20px"></div>
   `;
 }
 
